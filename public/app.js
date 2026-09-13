@@ -1482,11 +1482,12 @@ async function loadInitialState() {
   }
 
   // 2. Carrega do localStorage
+  let loadedFromStorage = false;
   try {
     const saved = localStorage.getItem('stream_aggregator_state');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed.addons)) {
+      if (Array.isArray(parsed.addons) && parsed.addons.length > 0) {
         state.addons = parsed.addons.map(a => ({
           ...a,
           timeoutMs: (a.timeoutMs && a.timeoutMs >= 20000) ? a.timeoutMs : 25000,
@@ -1494,27 +1495,28 @@ async function loadInitialState() {
           catalogs: Array.isArray(a.catalogs) ? a.catalogs : [],
           includeCatalogs: a.includeCatalogs !== false
         }));
+        loadedFromStorage = true;
       }
       if (Array.isArray(parsed.customCatalogs)) {
         state.customCatalogs = parsed.customCatalogs;
       }
-      if (Array.isArray(parsed.nuvioCollections)) {
+      if (Array.isArray(parsed.nuvioCollections) && parsed.nuvioCollections.length > 0) {
         state.nuvioCollections = parsed.nuvioCollections;
       }
       if (parsed.filters) state.filters = { ...state.filters, ...parsed.filters };
       if (parsed.badgeFormat) state.badgeFormat = parsed.badgeFormat;
-      syncDomFromFilters();
-      return;
     }
   } catch (e) {}
 
-  // 3. Se não tiver coleções salvas, carrega as coleções padrão para o Nuvio
-  try {
-    const defaultColResp = await fetch('/default-nuvio-collections.json');
-    if (defaultColResp.ok) {
-      state.nuvioCollections = await defaultColResp.json();
-    }
-  } catch (e) {}
+  // 3. Se ainda não tiver coleções carregadas, carrega as coleções padrão para o Nuvio
+  if (!state.nuvioCollections || state.nuvioCollections.length === 0) {
+    try {
+      const defaultColResp = await fetch('/default-nuvio-collections.json');
+      if (defaultColResp.ok) {
+        state.nuvioCollections = await defaultColResp.json();
+      }
+    } catch (e) {}
+  }
 
   syncDomFromFilters();
 }
