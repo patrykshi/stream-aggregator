@@ -56,7 +56,8 @@ export function getDefaultConfig() {
       removeCams: true,
       excludeRegex: '',
       maxStreamsPerAddon: 10,
-      maxTotalStreams: 30
+      maxTotalStreams: 30,
+      subtitleLanguages: ['pob', 'por', 'eng']
     },
     badgeFormat: 'addon', // 'addon', 'clean', 'none'
     deduplicate: true
@@ -74,7 +75,10 @@ export function sanitizeConfig(cfg) {
           url: a.url.trim().replace(/\/$/, ''),
           name: typeof a.name === 'string' && a.name.trim() ? a.name.trim() : `Addon ${idx + 1}`,
           timeoutMs: typeof a.timeoutMs === 'number' && a.timeoutMs >= 20000 ? a.timeoutMs : 25000,
-          enabled: a.enabled !== false
+          enabled: a.enabled !== false,
+          resources: Array.isArray(a.resources) && a.resources.length > 0 ? a.resources : ['stream'],
+          catalogs: Array.isArray(a.catalogs) ? a.catalogs : [],
+          includeCatalogs: a.includeCatalogs !== false
         }))
     : [];
 
@@ -85,7 +89,10 @@ export function sanitizeConfig(cfg) {
     removeCams: cfg.filters?.removeCams !== false,
     excludeRegex: typeof cfg.filters?.excludeRegex === 'string' ? cfg.filters.excludeRegex : '',
     maxStreamsPerAddon: typeof cfg.filters?.maxStreamsPerAddon === 'number' ? cfg.filters.maxStreamsPerAddon : def.filters.maxStreamsPerAddon,
-    maxTotalStreams: typeof cfg.filters?.maxTotalStreams === 'number' ? cfg.filters.maxTotalStreams : def.filters.maxTotalStreams
+    maxTotalStreams: typeof cfg.filters?.maxTotalStreams === 'number' ? cfg.filters.maxTotalStreams : def.filters.maxTotalStreams,
+    subtitleLanguages: Array.isArray(cfg.filters?.subtitleLanguages)
+      ? cfg.filters.subtitleLanguages
+      : def.filters.subtitleLanguages
   };
 
   return {

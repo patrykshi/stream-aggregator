@@ -7,7 +7,8 @@ const state = {
     deduplicate: true,
     excludeRegex: '',
     maxStreamsPerAddon: 10,
-    maxTotalStreams: 30
+    maxTotalStreams: 30,
+    subtitleLanguages: ['pob', 'por', 'eng']
   },
   badgeFormat: 'addon'
 };
@@ -34,6 +35,12 @@ const maxStreamsPerAddon = document.getElementById('maxStreamsPerAddon');
 const maxTotalStreams = document.getElementById('maxTotalStreams');
 const badgeFormat = document.getElementById('badgeFormat');
 
+// Legendas DOM
+const subPob = document.getElementById('subPob');
+const subPor = document.getElementById('subPor');
+const subEng = document.getElementById('subEng');
+const subSpa = document.getElementById('subSpa');
+
 // Instalação DOM
 const btnInstallStremio = document.getElementById('btnInstallStremio');
 const btnCopyUrl = document.getElementById('btnCopyUrl');
@@ -47,6 +54,9 @@ const modalAddonId = document.getElementById('modalAddonId');
 const modalAddonName = document.getElementById('modalAddonName');
 const modalAddonUrl = document.getElementById('modalAddonUrl');
 const modalAddonTimeout = document.getElementById('modalAddonTimeout');
+const modalResStream = document.getElementById('modalResStream');
+const modalResSubtitles = document.getElementById('modalResSubtitles');
+const modalResCatalogs = document.getElementById('modalResCatalogs');
 const modalTestFeedback = document.getElementById('modalTestFeedback');
 const btnModalTestAddon = document.getElementById('btnModalTestAddon');
 const btnModalSaveAddon = document.getElementById('btnModalSaveAddon');
@@ -92,10 +102,12 @@ function setupEventListeners() {
   const filterInputs = [
     res4k, res1080p, res720p, res480p,
     filterRemoveCams, filterDeduplicate,
-    filterRegex, maxStreamsPerAddon, maxTotalStreams, badgeFormat
+    filterRegex, maxStreamsPerAddon, maxTotalStreams, badgeFormat,
+    subPob, subPor, subEng, subSpa
   ];
 
   filterInputs.forEach(input => {
+    if (!input) return;
     input.addEventListener('input', () => {
       updateFiltersFromDom();
       updateManifestUrl();
@@ -145,11 +157,18 @@ function setupModalListeners() {
       });
       const data = await res.json();
       if (data.valid) {
-        modalTestFeedback.textContent = `Online! Addon: ${data.name} (recursos: ${data.hasStreamResource ? 'stream ativo' : 'sem stream direto'})`;
+        const resList = data.resources && data.resources.length > 0 ? data.resources.join(', ') : 'nenhum';
+        const catInfo = data.catalogs && data.catalogs.length > 0 ? ` (${data.catalogs.length} catálogos)` : '';
+        modalTestFeedback.textContent = `Online! Addon: "${data.name}" [${resList}]${catInfo}`;
         modalTestFeedback.className = 'feedback-msg success';
-        // Atualiza status no estado
+
+        // Atualiza estado do addon
         const addon = state.addons.find(a => a.id === modalAddonId.value);
-        if (addon) addon.status = 'online';
+        if (addon) {
+          addon.status = 'online';
+          if (Array.isArray(data.resources)) addon.availableResources = data.resources;
+          if (Array.isArray(data.catalogs)) addon.catalogs = data.catalogs;
+        }
       } else {
         modalTestFeedback.textContent = `Falha: ${data.error}`;
         modalTestFeedback.className = 'feedback-msg error';
@@ -180,9 +199,17 @@ function setupModalListeners() {
       return;
     }
 
+    // Atualiza recursos selecionados
+    const selectedResources = [];
+    if (modalResStream.checked) selectedResources.push('stream');
+    if (modalResSubtitles.checked) selectedResources.push('subtitles');
+    if (modalResCatalogs.checked) selectedResources.push('catalog', 'meta');
+
     addon.name = newName || addon.name;
     addon.url = newUrl;
     addon.timeoutMs = newTimeout;
+    addon.resources = selectedResources.length > 0 ? selectedResources : ['stream'];
+    addon.includeCatalogs = modalResCatalogs.checked;
 
     render();
     saveToStorage();
@@ -199,6 +226,13 @@ function openAddonSettings(id) {
   modalAddonName.value = addon.name;
   modalAddonUrl.value = addon.url;
   modalAddonTimeout.value = addon.timeoutMs || 25000;
+
+  // Recursos
+  const currentRes = addon.resources || ['stream'];
+  modalResStream.checked = currentRes.includes('stream');
+  modalResSubtitles.checked = currentRes.includes('subtitles');
+  modalResCatalogs.checked = addon.includeCatalogs !== false && (currentRes.includes('catalog') || (addon.catalogs && addon.catalogs.length > 0));
+
   modalTestFeedback.textContent = '';
   modalTestFeedback.className = 'feedback-msg';
 
@@ -216,12 +250,19 @@ function updateFiltersFromDom() {
   if (res720p.checked) resolutions.push('720p');
   if (res480p.checked) resolutions.push('480p');
 
+  const subLangs = [];
+  if (subPob && subPob.checked) subLangs.push('pob');
+  if (subPor && subPor.checked) subLangs.push('por');
+  if (subEng && subEng.checked) subLangs.push('eng');
+  if (subSpa && subSpa.checked) subLangs.push('spa');
+
   state.filters.resolutions = resolutions;
   state.filters.removeCams = filterRemoveCams.checked;
   state.filters.deduplicate = filterDeduplicate.checked;
   state.filters.excludeRegex = filterRegex.value.trim();
   state.filters.maxStreamsPerAddon = parseInt(maxStreamsPerAddon.value, 10) || 10;
   state.filters.maxTotalStreams = parseInt(maxTotalStreams.value, 10) || 30;
+  state.filters.subtitleLanguages = subLangs.length > 0 ? subLangs : ['pob', 'por', 'eng'];
   state.badgeFormat = badgeFormat.value;
 }
 
@@ -230,6 +271,12 @@ function syncDomFromFilters() {
   res1080p.checked = state.filters.resolutions.includes('1080p');
   res720p.checked = state.filters.resolutions.includes('720p');
   res480p.checked = state.filters.resolutions.includes('480p');
+
+  const subLangs = state.filters.subtitleLanguages || ['pob', 'por', 'eng'];
+  if (subPob) subPob.checked = subLangs.includes('pob');
+  if (subPor) subPor.checked = subLangs.includes('por');
+  if (subEng) subEng.checked = subLangs.includes('eng');
+  if (subSpa) subSpa.checked = subLangs.includes('spa');
 
   filterRemoveCams.checked = state.filters.removeCams;
   filterDeduplicate.checked = state.filters.deduplicate;
@@ -269,6 +316,8 @@ async function addAddon(suggestedName, rawUrl) {
     }
 
     const finalName = suggestedName || (data.valid && data.name) || 'Custom Addon';
+    const detectedResources = (data.valid && Array.isArray(data.resources)) ? data.resources : ['stream'];
+    const detectedCatalogs = (data.valid && Array.isArray(data.catalogs)) ? data.catalogs : [];
 
     state.addons.push({
       id: Date.now().toString(),
@@ -276,6 +325,9 @@ async function addAddon(suggestedName, rawUrl) {
       url,
       timeoutMs: 25000,
       enabled: true,
+      resources: detectedResources.length > 0 ? detectedResources : ['stream'],
+      catalogs: detectedCatalogs,
+      includeCatalogs: true,
       status: data.valid ? 'online' : 'unknown'
     });
 
@@ -356,17 +408,31 @@ function renderAddonList() {
       statusTitle = 'Addon Offline ou Inacessível';
     }
 
-    const timeoutSec = ((addon.timeoutMs || 7000) / 1000).toFixed(0);
+    const timeoutSec = ((addon.timeoutMs || 25000) / 1000).toFixed(0);
 
-    // Renderização limpa: SEM URL crua no card!
+    // Tags de recursos do addon
+    const res = addon.resources || ['stream'];
+    let tagsHtml = '<div class="resource-tags">';
+    if (res.includes('stream')) {
+      tagsHtml += '<span class="tag-res tag-res-stream">Stream</span>';
+    }
+    if (res.includes('subtitles')) {
+      tagsHtml += '<span class="tag-res tag-res-subtitles">Legendas</span>';
+    }
+    if (addon.includeCatalogs !== false && (res.includes('catalog') || (addon.catalogs && addon.catalogs.length > 0))) {
+      tagsHtml += '<span class="tag-res tag-res-catalogs">Catálogo</span>';
+    }
+    tagsHtml += '</div>';
+
     itemEl.innerHTML = `
       <div class="addon-info">
         <span class="addon-status-dot ${statusClass}" title="${statusTitle}"></span>
         <span class="addon-name" title="${escapeHtml(addon.name)}">${escapeHtml(addon.name)}</span>
+        ${tagsHtml}
         <span class="addon-timeout-tag" title="Timeout individual">${timeoutSec}s</span>
       </div>
       <div class="addon-actions">
-        <button type="button" class="btn-icon gear" title="Configurações & URL" onclick="window._openAddonSettings('${addon.id}')">⚙️</button>
+        <button type="button" class="btn-icon gear" title="Configurações & Recursos" onclick="window._openAddonSettings('${addon.id}')">⚙️</button>
         <button type="button" class="btn-icon" title="Subir prioridade" ${isFirst ? 'disabled style="opacity:0.25"' : ''} onclick="window._moveAddon('${addon.id}', -1)">↑</button>
         <button type="button" class="btn-icon" title="Descer prioridade" ${isLast ? 'disabled style="opacity:0.25"' : ''} onclick="window._moveAddon('${addon.id}', 1)">↓</button>
         <button type="button" class="btn-icon" title="${addon.enabled ? 'Desativar' : 'Ativar'}" onclick="window._toggleAddon('${addon.id}')">
@@ -391,8 +457,11 @@ async function updateManifestUrl() {
     addons: state.addons.map(a => ({
       name: a.name,
       url: a.url,
-      timeoutMs: a.timeoutMs || 7000,
-      enabled: a.enabled
+      timeoutMs: a.timeoutMs || 25000,
+      enabled: a.enabled,
+      resources: a.resources || ['stream'],
+      catalogs: a.catalogs || [],
+      includeCatalogs: a.includeCatalogs !== false
     })),
     filters: state.filters,
     badgeFormat: state.badgeFormat,
@@ -469,6 +538,9 @@ async function loadInitialState() {
             url: a.url,
             timeoutMs: (a.timeoutMs && a.timeoutMs >= 20000) ? a.timeoutMs : 25000,
             enabled: a.enabled !== false,
+            resources: Array.isArray(a.resources) && a.resources.length > 0 ? a.resources : ['stream'],
+            catalogs: Array.isArray(a.catalogs) ? a.catalogs : [],
+            includeCatalogs: a.includeCatalogs !== false,
             status: 'online'
           }));
           if (config.filters) state.filters = { ...state.filters, ...config.filters };
@@ -490,7 +562,10 @@ async function loadInitialState() {
       if (Array.isArray(parsed.addons)) {
         state.addons = parsed.addons.map(a => ({
           ...a,
-          timeoutMs: (a.timeoutMs && a.timeoutMs >= 20000) ? a.timeoutMs : 25000
+          timeoutMs: (a.timeoutMs && a.timeoutMs >= 20000) ? a.timeoutMs : 25000,
+          resources: Array.isArray(a.resources) && a.resources.length > 0 ? a.resources : ['stream'],
+          catalogs: Array.isArray(a.catalogs) ? a.catalogs : [],
+          includeCatalogs: a.includeCatalogs !== false
         }));
       }
       if (parsed.filters) state.filters = { ...state.filters, ...parsed.filters };

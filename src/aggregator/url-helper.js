@@ -32,7 +32,16 @@ export function parseAddonUrl(raw) {
       manifestUrl,
       baseUrl,
       search,
-      getStreamUrl: (type, id) => `${baseUrl}/stream/${encodeURIComponent(type)}/${encodeURIComponent(id)}.json${search}`
+      getStreamUrl: (type, id) => `${baseUrl}/stream/${encodeURIComponent(type)}/${encodeURIComponent(id)}.json${search}`,
+      getSubtitleUrl: (type, id, extra = '') => {
+        const extraPart = extra ? `/${encodeURIComponent(extra)}` : '';
+        return `${baseUrl}/subtitles/${encodeURIComponent(type)}/${encodeURIComponent(id)}${extraPart}.json${search}`;
+      },
+      getCatalogUrl: (type, catalogId, extra = '') => {
+        const extraPart = extra ? `/${encodeURIComponent(extra)}` : '';
+        return `${baseUrl}/catalog/${encodeURIComponent(type)}/${encodeURIComponent(catalogId)}${extraPart}.json${search}`;
+      },
+      getMetaUrl: (type, id) => `${baseUrl}/meta/${encodeURIComponent(type)}/${encodeURIComponent(id)}.json${search}`
     };
   } catch (err) {
     return null;
@@ -47,4 +56,3 @@ export const DEFAULT_FETCH_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Stremio/4.4.168',
   'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
 };
-

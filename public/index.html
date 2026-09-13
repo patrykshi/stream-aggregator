@@ -36,13 +36,20 @@
 
         <!-- Presets rápidos -->
         <div class="presets-section">
-          <label class="section-label">Presets Rápidos:</label>
+          <label class="section-label">Streams:</label>
           <div class="preset-buttons">
             <button type="button" class="btn-preset" data-name="Torrentio" data-url="https://torrentio.strem.fun/manifest.json">+ Torrentio</button>
             <button type="button" class="btn-preset" data-name="MediaFusion" data-url="https://mediafusion.elfhosted.com/manifest.json">+ MediaFusion</button>
             <button type="button" class="btn-preset" data-name="Comet" data-url="https://comet.elfhosted.com/manifest.json">+ Comet</button>
-            <button type="button" class="btn-preset" data-name="KnightCrawler" data-url="https://knightcrawler.elfhosted.com/manifest.json">+ KnightCrawler</button>
+            <button type="button" class="btn-preset" data-name="BestCine" data-url="https://bestcine.dpdns.org/manifest.json">+ Best Cine</button>
+            <button type="button" class="btn-preset" data-name="FrostStream" data-url="https://froststream.cloutteam.com/manifest.json">+ FrostStream</button>
             <button type="button" class="btn-preset" data-name="Emby Bridge" data-url="http://localhost:7000/manifest.json">+ Emby Local</button>
+          </div>
+          <label class="section-label" style="margin-top: 10px;">Legendas & Catálogos:</label>
+          <div class="preset-buttons">
+            <button type="button" class="btn-preset" data-name="OpenSubtitles v3" data-url="https://opensubtitles-v3.strem.io/manifest.json">+ OpenSubtitles</button>
+            <button type="button" class="btn-preset" data-name="CyberFlix" data-url="https://cyberflix.kamyk.io/manifest.json">+ CyberFlix</button>
+            <button type="button" class="btn-preset" data-name="Cinemeta" data-url="https://v3-cinemeta.strem.io/manifest.json">+ Cinemeta</button>
           </div>
         </div>
 
@@ -97,6 +104,16 @@
                 <span class="toggle-slider"></span>
                 <span>Desduplicar releases idênticos (mesmo torrent/hash)</span>
               </label>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="section-label">Idiomas de Legendas (Prioridade):</label>
+            <div class="checkbox-group">
+              <label class="checkbox-label"><input type="checkbox" id="subPob" checked> <span>Português Brasil (pob)</span></label>
+              <label class="checkbox-label"><input type="checkbox" id="subPor" checked> <span>Português Portugal (por)</span></label>
+              <label class="checkbox-label"><input type="checkbox" id="subEng" checked> <span>Inglês (eng)</span></label>
+              <label class="checkbox-label"><input type="checkbox" id="subSpa"> <span>Espanhol (spa)</span></label>
             </div>
           </div>
 
@@ -182,9 +199,19 @@
         </div>
 
         <div class="modal-form-group">
+          <label class="section-label">Recursos Utilizados deste Addon:</label>
+          <div class="checkbox-group" id="modalResourceCheckboxes">
+            <label class="checkbox-label"><input type="checkbox" id="modalResStream" checked> <span>📺 Streams</span></label>
+            <label class="checkbox-label"><input type="checkbox" id="modalResSubtitles" checked> <span>💬 Legendas</span></label>
+            <label class="checkbox-label"><input type="checkbox" id="modalResCatalogs" checked> <span>📚 Catálogos</span></label>
+          </div>
+          <small class="help-text">Você pode desmarcar recursos indesejados (ex: usar um addon apenas para legendas ou apenas para streams).</small>
+        </div>
+
+        <div class="modal-form-group">
           <label class="section-label" for="modalAddonTimeout">Timeout de Resposta (ms):</label>
-          <input type="number" id="modalAddonTimeout" class="input-number" min="1000" max="30000" step="500" value="7000">
-          <small class="help-text">Tempo máximo que o agregador esperará este addon responder antes de ignorar (padrão: 7000ms).</small>
+          <input type="number" id="modalAddonTimeout" class="input-number" min="1000" max="35000" step="1000" value="25000">
+          <small class="help-text">Tempo máximo de espera antes de ignorar (padrão: 25000ms para scrapers web).</small>
         </div>
 
         <div id="modalTestFeedback" class="feedback-msg"></div>

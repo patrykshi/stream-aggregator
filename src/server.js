@@ -7,6 +7,8 @@ import { encodeConfig, decodeConfig, getDefaultConfig } from './config/codec.js'
 import { aggregateStreams, normalizeAddonBaseUrl } from './aggregator/engine.js';
 import { generateManifest } from './aggregator/manifest.js';
 import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './aggregator/url-helper.js';
+import { aggregateSubtitles } from './aggregator/subtitles.js';
+import { fetchCatalog, fetchMeta } from './aggregator/catalogs.js';
 
 dotenv.config();
 
@@ -70,17 +72,23 @@ app.post('/api/validate-addon', async (req, res) => {
       });
     }
 
-    const hasStream = Array.isArray(manifest.resources) && manifest.resources.some(r =>
-      (typeof r === 'string' && r === 'stream') || (r && r.name === 'stream')
-    );
+    const resources = Array.isArray(manifest.resources)
+      ? manifest.resources.map(r => typeof r === 'string' ? r : r.name)
+      : [];
 
-    console.log(`[Validate Addon] Sucesso: "${manifest.name}" (${manifest.id})`);
+    const catalogs = Array.isArray(manifest.catalogs) ? manifest.catalogs : [];
+
+    console.log(`[Validate Addon] Sucesso: "${manifest.name}" (recursos: ${resources.join(', ')})`);
 
     return res.json({
       valid: true,
       name: manifest.name,
       description: manifest.description || '',
-      hasStreamResource: hasStream,
+      resources,
+      hasStreamResource: resources.includes('stream'),
+      hasSubtitlesResource: resources.includes('subtitles'),
+      hasCatalogResource: catalogs.length > 0 || resources.includes('catalog'),
+      catalogs,
       types: manifest.types || []
     });
   } catch (err) {
@@ -106,7 +114,7 @@ app.get('/api/decode-config/:token', (req, res) => {
   res.json({ config });
 });
 
-// Stremio: Manifest sem configuração (Redireciona para / ou devolve manifest padrão)
+// Stremio: Manifest sem configuração
 app.get('/manifest.json', (req, res) => {
   const def = getDefaultConfig();
   res.json(generateManifest(def));
@@ -130,6 +138,51 @@ app.get('/:config/stream/:type/:id.json', async (req, res) => {
   } catch (err) {
     console.error('Erro ao agregar streams:', err);
     res.status(500).json({ streams: [], error: err.message });
+  }
+});
+
+// Stremio: Subtitles endpoint
+app.get(['/:config/subtitles/:type/:id.json', '/:config/subtitles/:type/:id/:extra.json'], async (req, res) => {
+  const { config: rawConfig, type, id, extra } = req.params;
+  const config = decodeConfig(rawConfig);
+
+  try {
+    const result = await aggregateSubtitles(config, type, id, extra || '');
+    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+    res.json(result);
+  } catch (err) {
+    console.error('Erro ao agregar legendas:', err);
+    res.status(500).json({ subtitles: [], error: err.message });
+  }
+});
+
+// Stremio: Catalog endpoint
+app.get(['/:config/catalog/:type/:id.json', '/:config/catalog/:type/:id/:extra.json'], async (req, res) => {
+  const { config: rawConfig, type, id, extra } = req.params;
+  const config = decodeConfig(rawConfig);
+
+  try {
+    const result = await fetchCatalog(config, type, id, extra || '');
+    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+    res.json(result);
+  } catch (err) {
+    console.error('Erro ao consultar catálogo:', err);
+    res.status(500).json({ metas: [], error: err.message });
+  }
+});
+
+// Stremio: Meta endpoint
+app.get('/:config/meta/:type/:id.json', async (req, res) => {
+  const { config: rawConfig, type, id } = req.params;
+  const config = decodeConfig(rawConfig);
+
+  try {
+    const result = await fetchMeta(config, type, id);
+    res.setHeader('Cache-Control', 'max-age=3600, stale-while-revalidate=7200');
+    res.json(result);
+  } catch (err) {
+    console.error('Erro ao consultar metadados:', err);
+    res.status(500).json({ meta: null, error: err.message });
   }
 });
 
