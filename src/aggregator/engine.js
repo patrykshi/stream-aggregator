@@ -1,4 +1,5 @@
 import { filterStreams, deduplicateStreams, enrichStreamBadge } from './filter.js';
+import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './url-helper.js';
 
 // Cache LRU em memória simples com TTL
 class SimpleCache {
@@ -36,19 +37,22 @@ const streamCache = new SimpleCache(300, 25000); // 25s TTL
  * Normaliza a URL base do addon removendo `/manifest.json` se presente.
  */
 export function normalizeAddonBaseUrl(rawUrl) {
-  let url = rawUrl.trim();
-  url = url.replace(/\/manifest\.json$/i, '');
-  url = url.replace(/\/+$/, '');
-  return url;
+  const parsed = parseAddonUrl(rawUrl);
+  return parsed ? parsed.baseUrl : rawUrl.trim().replace(/\/manifest\.json$/i, '').replace(/\/+$/, '');
 }
 
 /**
  * Consulta os streams de um addon específico com timeout.
  */
 async function fetchAddonStreams(addon, type, id) {
-  const baseUrl = normalizeAddonBaseUrl(addon.url);
-  const streamUrl = `${baseUrl}/stream/${encodeURIComponent(type)}/${encodeURIComponent(id)}.json`;
-  const timeoutMs = addon.timeoutMs || 7000;
+  const parsed = parseAddonUrl(addon.url);
+  if (!parsed) {
+    console.warn(`[${addon.name}] URL de addon inválida: ${addon.url}`);
+    return [];
+  }
+
+  const streamUrl = parsed.getStreamUrl(type, id);
+  const timeoutMs = addon.timeoutMs || 8000;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -56,10 +60,8 @@ async function fetchAddonStreams(addon, type, id) {
   try {
     const res = await fetch(streamUrl, {
       signal: controller.signal,
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Stream-Aggregator)'
-      }
+      headers: DEFAULT_FETCH_HEADERS,
+      redirect: 'follow'
     });
 
     clearTimeout(timeoutId);

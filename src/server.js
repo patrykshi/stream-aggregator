@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { encodeConfig, decodeConfig, getDefaultConfig } from './config/codec.js';
 import { aggregateStreams, normalizeAddonBaseUrl } from './aggregator/engine.js';
 import { generateManifest } from './aggregator/manifest.js';
+import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './aggregator/url-helper.js';
 
 dotenv.config();
 
@@ -32,26 +33,28 @@ app.post('/api/validate-addon', async (req, res) => {
     return res.status(400).json({ valid: false, error: 'URL inválida ou vazia.' });
   }
 
-  let manifestUrl = url.trim();
-  if (!manifestUrl.endsWith('/manifest.json')) {
-    manifestUrl = `${manifestUrl.replace(/\/+$/, '')}/manifest.json`;
+  const parsed = parseAddonUrl(url);
+  if (!parsed) {
+    return res.status(400).json({ valid: false, error: 'Formato de URL inválido.' });
   }
 
+  const manifestUrl = parsed.manifestUrl;
+  console.log(`[Validate Addon] Testando manifest: ${manifestUrl}`);
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos
 
   try {
     const response = await fetch(manifestUrl, {
       signal: controller.signal,
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Stream-Aggregator)'
-      }
+      headers: DEFAULT_FETCH_HEADERS,
+      redirect: 'follow'
     });
 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      console.warn(`[Validate Addon] Falha HTTP ${response.status} em ${manifestUrl}`);
       return res.status(200).json({
         valid: false,
         error: `O servidor retornou HTTP ${response.status}`
@@ -60,6 +63,7 @@ app.post('/api/validate-addon', async (req, res) => {
 
     const manifest = await response.json();
     if (!manifest || !manifest.id || !manifest.name) {
+      console.warn(`[Validate Addon] JSON inválido recebido de ${manifestUrl}`);
       return res.status(200).json({
         valid: false,
         error: 'JSON retornado não é um manifest Stremio válido (faltando id ou name).'
@@ -70,6 +74,8 @@ app.post('/api/validate-addon', async (req, res) => {
       (typeof r === 'string' && r === 'stream') || (r && r.name === 'stream')
     );
 
+    console.log(`[Validate Addon] Sucesso: "${manifest.name}" (${manifest.id})`);
+
     return res.json({
       valid: true,
       name: manifest.name,
@@ -79,9 +85,12 @@ app.post('/api/validate-addon', async (req, res) => {
     });
   } catch (err) {
     clearTimeout(timeoutId);
+    console.error(`[Validate Addon] Erro ao consultar ${manifestUrl}:`, err.message);
     return res.status(200).json({
       valid: false,
-      error: err.name === 'AbortError' ? 'Tempo de conexão esgotado (timeout 6s)' : err.message
+      error: err.name === 'AbortError'
+        ? 'Tempo limite esgotado (15s). O servidor do addon demorou muito para responder.'
+        : `Erro de conexão: ${err.message}`
     });
   }
 });
