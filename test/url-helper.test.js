@@ -37,5 +37,12 @@ describe('URL Helper', () => {
     assert.equal(parsed.baseUrl, 'https://torrentio.strem.fun/providers=yts');
     assert.equal(parsed.getStreamUrl('movie', 'tt123'), 'https://torrentio.strem.fun/providers=yts/stream/movie/tt123.json');
   });
+
+  it('deve auto-corrigir domínio descontinuado do OpenSubtitles de strem.fun para strem.io', () => {
+    const parsed = parseAddonUrl('https://opensubtitles-v3.strem.fun/manifest.json');
+    assert.equal(parsed.manifestUrl, 'https://opensubtitles-v3.strem.io/manifest.json');
+    assert.equal(parsed.baseUrl, 'https://opensubtitles-v3.strem.io');
+    assert.equal(parsed.getSubtitleUrl('movie', 'tt0137523'), 'https://opensubtitles-v3.strem.io/subtitles/movie/tt0137523.json');
+  });
 });
 

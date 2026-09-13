@@ -15,6 +15,11 @@ export function parseAddonUrl(raw) {
     trimmed = 'https://' + trimmed;
   }
 
+  // Auto-corrige domínios legados/descontinuados
+  if (trimmed.includes('opensubtitles-v3.strem.fun')) {
+    trimmed = trimmed.replace('opensubtitles-v3.strem.fun', 'opensubtitles-v3.strem.io');
+  }
+
   try {
     const urlObj = new URL(trimmed);
 

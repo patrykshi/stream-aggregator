@@ -288,6 +288,12 @@ function syncDomFromFilters() {
 
 async function addAddon(suggestedName, rawUrl) {
   let url = rawUrl.trim();
+
+  // Auto-corrige domínio descontinuado do OpenSubtitles
+  if (url.includes('opensubtitles-v3.strem.fun')) {
+    url = url.replace('opensubtitles-v3.strem.fun', 'opensubtitles-v3.strem.io');
+  }
+
   if (!url.endsWith('/manifest.json')) {
     url = `${url.replace(/\/+$/, '')}/manifest.json`;
   }
