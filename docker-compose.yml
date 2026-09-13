@@ -16,3 +16,17 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: stream-aggregator-tunnel
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      - stream-aggregator
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

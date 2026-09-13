@@ -1,0 +1,7 @@
+tunnel: 39585d32-68b4-4a2a-80e6-1e90d2691476
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: stream.patrykrocha.com
+    service: http://stream-aggregator:7001
+  - service: http_status:404

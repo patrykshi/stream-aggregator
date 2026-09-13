@@ -59,13 +59,28 @@ O servidor estará rodando em: `http://localhost:7001` (ou na porta definida em 
 
 ---
 
-## 🌐 Expor Publicamente com Tailscale Funnel (Opcional)
+---
 
-Se você já usa Tailscale Funnel (como no `emby-bridge`):
+## 🌐 Distribuição Pública com Cloudflare Tunnel ☁️
 
-```bash
-sudo tailscale funnel --bg --https=8444 http://localhost:7001
-```
+O projeto já está integrado com **Cloudflare Tunnel** no `docker-compose.yml` e com rota CNAME apontada para:
 
-Depois basta acessar a URL pública dada pelo Funnel (ex: `https://seu-host.<tailnet>.ts.net:8444`) para configurar e instalar em qualquer dispositivo (TV, celular, etc.).
+👉 **[https://stream.patrykrocha.com](https://stream.patrykrocha.com)**
+
+### Como funciona:
+- O container `stream-aggregator-tunnel` (`cloudflare/cloudflared:latest`) conecta diretamente na borda da Cloudflare.
+- Fornece HTTPS válido automático sem abrir portas no roteador nem expor o IP da sua máquina.
+- As URLs geradas no painel já usam `https://stream.patrykrocha.com/:token/manifest.json` e `stremio://stream.patrykrocha.com/:token/manifest.json`.
+
+---
+
+## 📲 Como Instalar no Stremio e Nuvio
+
+1. Abra **[https://stream.patrykrocha.com](https://stream.patrykrocha.com)** no seu navegador.
+2. Adicione os seus addons favoritos (Torrentio, MediaFusion, Comet, Best Cine, Emby, etc.) e defina suas regras.
+3. **No Stremio**:
+   - Clique no botão **🎬 Instalar no Stremio** (abre o app diretamente).
+   - Ou copie a URL do manifest e cole no campo de pesquisa da aba **Add-ons** do Stremio.
+4. **No Nuvio**:
+   - Vá em **Configurações → Plugins/Addons** e cole a URL `https://stream.patrykrocha.com/:token/manifest.json`.
 

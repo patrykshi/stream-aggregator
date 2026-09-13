@@ -38,3 +38,4 @@ describe('URL Helper', () => {
     assert.equal(parsed.getStreamUrl('movie', 'tt123'), 'https://torrentio.strem.fun/providers=yts/stream/movie/tt123.json');
   });
 });
+
