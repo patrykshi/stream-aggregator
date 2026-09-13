@@ -5,3 +5,4 @@ ingress:
   - hostname: stream.patrykrocha.com
     service: http://stream-aggregator:7001
   - service: http_status:404
+

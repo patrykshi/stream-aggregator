@@ -1,4 +1,5 @@
-const CAM_REGEX = /\b(cam|camrip|hdcam|ts|telesync|hdts|telecine|tc|scr|screener|dvdscr)\b/i;
+// Termos estritos de gravações CAM/Screener de cinema (evita falsos positivos com canais Telecine ou .ts)
+const CAM_REGEX = /\b(camrip|hd-?cam|hd-?ts|telesync|dvd-?scr|screener)\b/i;
 
 const RESOLUTION_PATTERNS = [
   { label: '4k', regex: /\b(4k|2160p|uhd)\b/i },

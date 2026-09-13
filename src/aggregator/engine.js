@@ -52,10 +52,13 @@ async function fetchAddonStreams(addon, type, id) {
   }
 
   const streamUrl = parsed.getStreamUrl(type, id);
-  const timeoutMs = addon.timeoutMs || 8000;
+  // Garante pelo menos 22s de timeout mesmo se tokens antigos tiverem 7000ms salvos
+  const configuredTimeout = typeof addon.timeoutMs === 'number' ? addon.timeoutMs : 25000;
+  const timeoutMs = Math.max(configuredTimeout, 22000);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const startTime = Date.now();
 
   try {
     const res = await fetch(streamUrl, {
@@ -65,24 +68,28 @@ async function fetchAddonStreams(addon, type, id) {
     });
 
     clearTimeout(timeoutId);
+    const elapsed = Date.now() - startTime;
 
     if (!res.ok) {
-      console.warn(`[${addon.name}] HTTP ${res.status} ao consultar ${streamUrl}`);
+      console.warn(`[${addon.name}] HTTP ${res.status} após ${elapsed}ms em ${streamUrl}`);
       return [];
     }
 
     const data = await res.json();
     if (!data || !Array.isArray(data.streams)) {
+      console.log(`[${addon.name}] Respondeu em ${elapsed}ms sem streams.`);
       return [];
     }
 
+    console.log(`[${addon.name}] ✅ ${data.streams.length} stream(s) encontrados em ${elapsed}ms`);
     return data.streams;
   } catch (err) {
     clearTimeout(timeoutId);
+    const elapsed = Date.now() - startTime;
     if (err.name === 'AbortError') {
-      console.warn(`[${addon.name}] Timeout de ${timeoutMs}ms excedido.`);
+      console.warn(`[${addon.name}] ⏱️ Timeout de ${timeoutMs}ms excedido.`);
     } else {
-      console.warn(`[${addon.name}] Falha na requisição:`, err.message);
+      console.warn(`[${addon.name}] ❌ Falha após ${elapsed}ms:`, err.message);
     }
     return [];
   }

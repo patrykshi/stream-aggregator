@@ -172,7 +172,7 @@ function setupModalListeners() {
 
     const newName = modalAddonName.value.trim();
     const newUrl = modalAddonUrl.value.trim();
-    const newTimeout = parseInt(modalAddonTimeout.value, 10) || 7000;
+    const newTimeout = parseInt(modalAddonTimeout.value, 10) || 25000;
 
     if (!newUrl) {
       modalTestFeedback.textContent = 'A URL não pode ficar vazia.';
@@ -198,7 +198,7 @@ function openAddonSettings(id) {
   modalAddonId.value = addon.id;
   modalAddonName.value = addon.name;
   modalAddonUrl.value = addon.url;
-  modalAddonTimeout.value = addon.timeoutMs || 7000;
+  modalAddonTimeout.value = addon.timeoutMs || 25000;
   modalTestFeedback.textContent = '';
   modalTestFeedback.className = 'feedback-msg';
 
@@ -274,7 +274,7 @@ async function addAddon(suggestedName, rawUrl) {
       id: Date.now().toString(),
       name: finalName,
       url,
-      timeoutMs: 7000,
+      timeoutMs: 25000,
       enabled: true,
       status: data.valid ? 'online' : 'unknown'
     });
@@ -467,7 +467,7 @@ async function loadInitialState() {
             id: String(i),
             name: a.name,
             url: a.url,
-            timeoutMs: a.timeoutMs || 7000,
+            timeoutMs: (a.timeoutMs && a.timeoutMs >= 20000) ? a.timeoutMs : 25000,
             enabled: a.enabled !== false,
             status: 'online'
           }));
@@ -487,7 +487,12 @@ async function loadInitialState() {
     const saved = localStorage.getItem('stream_aggregator_state');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed.addons)) state.addons = parsed.addons;
+      if (Array.isArray(parsed.addons)) {
+        state.addons = parsed.addons.map(a => ({
+          ...a,
+          timeoutMs: (a.timeoutMs && a.timeoutMs >= 20000) ? a.timeoutMs : 25000
+        }));
+      }
       if (parsed.filters) state.filters = { ...state.filters, ...parsed.filters };
       if (parsed.badgeFormat) state.badgeFormat = parsed.badgeFormat;
       syncDomFromFilters();

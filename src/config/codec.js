@@ -73,7 +73,7 @@ export function sanitizeConfig(cfg) {
         .map((a, idx) => ({
           url: a.url.trim().replace(/\/$/, ''),
           name: typeof a.name === 'string' && a.name.trim() ? a.name.trim() : `Addon ${idx + 1}`,
-          timeoutMs: typeof a.timeoutMs === 'number' && a.timeoutMs > 0 ? a.timeoutMs : 7000,
+          timeoutMs: typeof a.timeoutMs === 'number' && a.timeoutMs >= 20000 ? a.timeoutMs : 25000,
           enabled: a.enabled !== false
         }))
     : [];
