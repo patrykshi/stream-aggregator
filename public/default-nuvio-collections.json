@@ -1,0 +1,469 @@
+[
+  {
+    "id": "6f3f27e0-914a-42e2-aba1-8a91ae23a74f",
+    "title": "Novos & Trending",
+    "backdropImageUrl": null,
+    "pinToTop": false,
+    "focusGlowEnabled": true,
+    "viewMode": "TABBED_GRID",
+    "showAllTab": false,
+    "folders": [
+      {
+        "id": "f9291a19-1e01-4ecf-9243-34e0e5ba484b",
+        "title": "📅 Adicionados Recentemente",
+        "coverImageUrl": "https://raw.githubusercontent.com/RandomNinjaAtk/Ninja-Streams/refs/heads/main/AIOMetadata/artwork/collection-latest.png",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": null,
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.recent_releases.ninja_streams",
+            "catalogName": "📅 Lançados Recentemente",
+            "title": "📅 Lançados Recentemente",
+            "genre": null
+          },
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "series",
+            "catalogId": "tmdb.discover.series.latest.ninja_streams",
+            "catalogName": "📅 Lançados Recentemente",
+            "title": "📅 Lançados Recentemente",
+            "genre": "None"
+          },
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "anime",
+            "catalogId": "mdblist.89621",
+            "catalogName": "📅 Lançados Recentemente",
+            "title": "📅 Lançados Recentemente",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "b7269b2e-cc48-4aa4-8865-cbf4e1373e51",
+        "title": "🔥 Trending",
+        "coverImageUrl": "https://raw.githubusercontent.com/RandomNinjaAtk/Ninja-Streams/refs/heads/main/AIOMetadata/artwork/collection-trending.png",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": null,
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "mdblist.202247",
+            "catalogName": "🔥 Trending",
+            "title": "🔥 Trending",
+            "genre": "None"
+          },
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "series",
+            "catalogId": "mdblist.202249",
+            "catalogName": "🔥 Trending",
+            "title": "🔥 Trending",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "01def11e-11ed-4c7c-bbc7-16dbceb706ab",
+        "title": "🏆 Popular",
+        "coverImageUrl": "https://raw.githubusercontent.com/RandomNinjaAtk/Ninja-Streams/refs/heads/main/AIOMetadata/artwork/collection-popular.png",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": null,
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.popular.ninja_streams",
+            "catalogName": "🏆 Popular",
+            "title": "🏆 Popular",
+            "genre": "None"
+          },
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "series",
+            "catalogId": "tmdb.discover.series.popular.ninja_streams",
+            "catalogName": "🏆 Popular",
+            "title": "🏆 Popular",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "ca89d729-51b7-4f29-8e16-4c73abf6578f",
+        "title": "⭐ Top",
+        "coverImageUrl": "https://raw.githubusercontent.com/RandomNinjaAtk/Ninja-Streams/refs/heads/main/AIOMetadata/artwork/collection-top.png",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": null,
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.top.ninja_streams",
+            "catalogName": "⭐ Top",
+            "title": "⭐ Top",
+            "genre": "None"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "3b34ff3c-725a-4c42-81c9-2777ea814e01",
+    "title": "Streaming",
+    "backdropImageUrl": null,
+    "pinToTop": false,
+    "focusGlowEnabled": true,
+    "viewMode": "TABBED_GRID",
+    "showAllTab": false,
+    "folders": [
+      {
+        "id": "3d442824-bfa5-4df0-aced-60d4d61c1ccf",
+        "title": "Netflix",
+        "coverImageUrl": "https://cdn.xperience-app.com/covers/default/streaming_services.netflix.webp",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": "🍿⃢📺",
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.netflix.ninja_streams",
+            "catalogName": "🕸️ Netflix",
+            "title": "🕸️ Netflix",
+            "genre": "None"
+          },
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "series",
+            "catalogId": "tmdb.discover.series.netflix.ninja_streams",
+            "catalogName": "🕸️ Netflix",
+            "title": "🕸️ Netflix",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "f7869c75-713e-40d9-8afb-49728eb22f55",
+        "title": "HBO Max",
+        "coverImageUrl": "https://cdn.xperience-app.com/covers/default/streaming_services.hbo_max.webp",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": "🍿⃢📺",
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.hbo_max.ninja_streams",
+            "catalogName": "🕸️ HBO Max",
+            "title": "🕸️ HBO Max",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "300e3f32-6198-4469-9e42-306aabc5a442",
+        "title": "Disney+",
+        "coverImageUrl": "https://cdn.xperience-app.com/covers/default/streaming_services.disney_plus.webp",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": "🍿⃢📺",
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.disney_plus.ninja_streams",
+            "catalogName": "🕸️ Disney+",
+            "title": "🕸️ Disney+",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "a0593b5d-d822-47aa-bceb-607872269838",
+        "title": "Prime Video",
+        "coverImageUrl": "https://cdn.xperience-app.com/covers/default/streaming_services.prime_video.webp",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": "🍿⃢📺",
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.prime_video.ninja_streams",
+            "catalogName": "🕸️ Prime Video",
+            "title": "🕸️ Prime Video",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "ef8c724c-d50e-41ee-8b77-642fa5674a82",
+        "title": "Crunchyroll",
+        "coverImageUrl": "https://cdn.xperience-app.com/covers/default/streaming_services.crunchyroll.webp",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": "🍿⃢📺",
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.crunchyroll.ninja_streams",
+            "catalogName": "🕸️ Crunchyroll",
+            "title": "🕸️ Crunchyroll",
+            "genre": "None"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "36e8fee7-498e-4db9-adf6-7405084241e3",
+    "title": "Gêneros",
+    "backdropImageUrl": null,
+    "pinToTop": false,
+    "focusGlowEnabled": true,
+    "viewMode": "TABBED_GRID",
+    "showAllTab": false,
+    "folders": [
+      {
+        "id": "103e6289-4c6e-4188-a236-c8315ca31527",
+        "title": "Ação",
+        "coverImageUrl": "https://i.postimg.cc/qvhG7VGb/ACAO-CARTAZ.png",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": "🎬",
+        "tileShape": "POSTER",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.action.ninja_streams",
+            "catalogName": "🎭 Action",
+            "title": "🎭 Action",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "f38e6dd4-3b30-46a7-ab86-2ef6d705407d",
+        "title": "Animação",
+        "coverImageUrl": "https://i.postimg.cc/SNtrqNcv/ANIMACAO-CARTAZ.png",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": "🎬",
+        "tileShape": "POSTER",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.animation.ninja_streams",
+            "catalogName": "🎭 Animation",
+            "title": "🎭 Animation",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "54c43d9b-8097-469d-adac-9072a00b6481",
+        "title": "Comédia",
+        "coverImageUrl": "https://i.postimg.cc/fTgKZTY8/COMEDIA-CARTAZ.png",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": "🎬",
+        "tileShape": "POSTER",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.comedy.ninja_streams",
+            "catalogName": "🎭 Comedy",
+            "title": "🎭 Comedy",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "210c7264-c7b4-4a89-9e7b-ac0a421c0137",
+        "title": "Terror",
+        "coverImageUrl": "https://i.postimg.cc/3JwBPD0p/TERROR-CARTAZ.png",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": "🎬",
+        "tileShape": "POSTER",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.horror.ninja_streams",
+            "catalogName": "🎭 Horror",
+            "title": "🎭 Horror",
+            "genre": "None"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "d9ced53b-49a8-4ff0-b8e4-0256484aabbf",
+    "title": "Studios",
+    "backdropImageUrl": null,
+    "pinToTop": false,
+    "focusGlowEnabled": true,
+    "viewMode": "TABBED_GRID",
+    "showAllTab": true,
+    "folders": [
+      {
+        "id": "847bf062-a72b-4967-be37-f57075d305b0",
+        "title": "DC",
+        "coverImageUrl": "https://cdn.xperience-app.com/covers/default/studios.dc.webp?v=7",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": null,
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.dc.ninja_streams",
+            "catalogName": "DC",
+            "title": "DC",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "ed28e116-e50b-4ca2-885b-8a585f9425fe",
+        "title": "Marvel",
+        "coverImageUrl": "https://cdn.xperience-app.com/covers/default/studios.marvel.webp?v=7",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": null,
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.marvel.ninja_streams",
+            "catalogName": "Marvel",
+            "title": "Marvel",
+            "genre": "None"
+          }
+        ]
+      },
+      {
+        "id": "62be746b-7203-49bc-a919-6814b529decc",
+        "title": "Pixar",
+        "coverImageUrl": "https://cdn.xperience-app.com/covers/default/studios.pixar.webp?v=7",
+        "focusGifUrl": null,
+        "focusGifEnabled": true,
+        "coverEmoji": null,
+        "tileShape": "LANDSCAPE",
+        "hideTitle": true,
+        "sources": [
+          {
+            "provider": "addon",
+            "addonId": "aio-metadata",
+            "addonBaseUrl": "https://aiometadata.elfhosted.com/stremio/6fc74189-1177-4b9b-a263-a35005e4f160",
+            "addonName": "AIOMetadata  | ElfHosted",
+            "type": "movie",
+            "catalogId": "tmdb.discover.movie.pixar.ninja_streams",
+            "catalogName": "Pixar",
+            "title": "Pixar",
+            "genre": "None"
+          }
+        ]
+      }
+    ]
+  }
+]

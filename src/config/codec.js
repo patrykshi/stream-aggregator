@@ -52,6 +52,7 @@ export function getDefaultConfig() {
   return {
     addons: [],
     customCatalogs: [],
+    nuvioCollections: [],
     filters: {
       resolutions: ['4k', '1080p', '720p', '480p'],
       removeCams: true,
@@ -98,6 +99,8 @@ export function sanitizeConfig(cfg) {
       }))
     : [];
 
+  const nuvioCollections = Array.isArray(cfg.nuvioCollections) ? cfg.nuvioCollections : [];
+
   const filters = {
     resolutions: Array.isArray(cfg.filters?.resolutions)
       ? cfg.filters.resolutions.map(r => String(r).toLowerCase())
@@ -114,6 +117,7 @@ export function sanitizeConfig(cfg) {
   return {
     addons,
     customCatalogs,
+    nuvioCollections,
     filters,
     badgeFormat: ['addon', 'clean', 'none'].includes(cfg.badgeFormat) ? cfg.badgeFormat : 'addon',
     deduplicate: cfg.deduplicate !== false

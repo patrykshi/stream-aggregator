@@ -2,6 +2,7 @@
 const state = {
   addons: [],
   customCatalogs: [],
+  nuvioCollections: [],
   filters: {
     resolutions: ['4k', '1080p', '720p', '480p'],
     removeCams: true,
@@ -17,10 +18,27 @@ const state = {
 // Elementos DOM - Abas
 const tabBtnAddons = document.getElementById('tabBtnAddons');
 const tabBtnCatalogs = document.getElementById('tabBtnCatalogs');
+const tabBtnCollections = document.getElementById('tabBtnCollections');
 const tabContentAddons = document.getElementById('tabContentAddons');
 const tabContentCatalogs = document.getElementById('tabContentCatalogs');
+const tabContentCollections = document.getElementById('tabContentCollections');
 const tabAddonsBadge = document.getElementById('tabAddonsBadge');
 const tabCatalogsBadge = document.getElementById('tabCatalogsBadge');
+const tabCollectionsBadge = document.getElementById('tabCollectionsBadge');
+
+// Elementos DOM - Nuvio Collections Studio
+const btnLoadSampleCollections = document.getElementById('btnLoadSampleCollections');
+const btnCopyCollectionsJson = document.getElementById('btnCopyCollectionsJson');
+const btnDownloadCollectionsJson = document.getElementById('btnDownloadCollectionsJson');
+const btnNewCategory = document.getElementById('btnNewCategory');
+const btnModeVisual = document.getElementById('btnModeVisual');
+const btnModeJson = document.getElementById('btnModeJson');
+const collectionsVisualView = document.getElementById('collectionsVisualView');
+const collectionsJsonView = document.getElementById('collectionsJsonView');
+const collectionsCategoryList = document.getElementById('collectionsCategoryList');
+const collectionsJsonEditor = document.getElementById('collectionsJsonEditor');
+const btnApplyJsonCollections = document.getElementById('btnApplyJsonCollections');
+const jsonEditorFeedback = document.getElementById('jsonEditorFeedback');
 
 // Elementos DOM - Provedores
 const addonUrlInput = document.getElementById('addonUrlInput');
@@ -94,22 +112,19 @@ window.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   setupModalListeners();
   setupCatalogStudioListeners();
+  setupCollectionsStudioListeners();
   await loadInitialState();
   render();
 });
 
 function switchTab(tab) {
-  if (tab === 'addons') {
-    tabBtnAddons.classList.add('active');
-    tabBtnCatalogs.classList.remove('active');
-    tabContentAddons.classList.add('active');
-    tabContentCatalogs.classList.remove('active');
-  } else {
-    tabBtnAddons.classList.remove('active');
-    tabBtnCatalogs.classList.add('active');
-    tabContentAddons.classList.remove('active');
-    tabContentCatalogs.classList.add('active');
-  }
+  tabBtnAddons.classList.toggle('active', tab === 'addons');
+  tabBtnCatalogs.classList.toggle('active', tab === 'catalogs');
+  tabBtnCollections.classList.toggle('active', tab === 'collections');
+
+  tabContentAddons.classList.toggle('active', tab === 'addons');
+  tabContentCatalogs.classList.toggle('active', tab === 'catalogs');
+  tabContentCollections.classList.toggle('active', tab === 'collections');
 }
 window.switchTab = switchTab;
 
@@ -431,6 +446,7 @@ function toggleAddon(id) {
 function render() {
   renderAddonList();
   renderCatalogStudio();
+  renderNuvioCollections();
   updateManifestUrl();
 }
 
@@ -972,6 +988,294 @@ window._toggleHomeCatalog = toggleHomeCatalog;
 window._deleteCatalog = deleteCatalog;
 window._editMergedCatalog = (id) => openMergedCatalogModal(id);
 
+// ==========================================================================
+// NUVIO COLLECTIONS STUDIO - FUNÇÕES & EVENTOS
+// ==========================================================================
+
+function setupCollectionsStudioListeners() {
+  if (btnLoadSampleCollections) {
+    btnLoadSampleCollections.addEventListener('click', loadSampleCollections);
+  }
+
+  if (btnCopyCollectionsJson) {
+    btnCopyCollectionsJson.addEventListener('click', copyCollectionsJson);
+  }
+
+  if (btnDownloadCollectionsJson) {
+    btnDownloadCollectionsJson.addEventListener('click', downloadCollectionsJson);
+  }
+
+  if (btnNewCategory) {
+    btnNewCategory.addEventListener('click', addNewCategory);
+  }
+
+  if (btnApplyJsonCollections) {
+    btnApplyJsonCollections.addEventListener('click', applyJsonCollections);
+  }
+}
+
+function switchCollectionsMode(mode) {
+  if (mode === 'visual') {
+    btnModeVisual.classList.add('active');
+    btnModeJson.classList.remove('active');
+    collectionsVisualView.style.display = 'block';
+    collectionsJsonView.style.display = 'none';
+    renderNuvioCollections();
+  } else {
+    btnModeVisual.classList.remove('active');
+    btnModeJson.classList.add('active');
+    collectionsVisualView.style.display = 'none';
+    collectionsJsonView.style.display = 'block';
+    collectionsJsonEditor.value = JSON.stringify(state.nuvioCollections || [], null, 2);
+  }
+}
+window.switchCollectionsMode = switchCollectionsMode;
+
+function renderNuvioCollections() {
+  if (!collectionsCategoryList) return;
+  collectionsCategoryList.innerHTML = '';
+  const categories = state.nuvioCollections || [];
+  if (tabCollectionsBadge) tabCollectionsBadge.textContent = categories.length;
+
+  if (categories.length === 0) {
+    collectionsCategoryList.innerHTML = `
+      <div class="empty-state">
+        Nenhuma coleção criada ainda. Clique em "📦 Carregar Exemplo Completo" para importar o template com Trending, Streaming, Gêneros e Décadas!
+      </div>
+    `;
+    return;
+  }
+
+  categories.forEach((cat, catIdx) => {
+    const card = document.createElement('div');
+    card.className = 'collection-category-card';
+
+    const folders = Array.isArray(cat.folders) ? cat.folders : [];
+
+    let foldersHtml = '';
+    folders.forEach((folder, folderIdx) => {
+      const coverUrl = folder.coverImageUrl;
+      const emoji = folder.coverEmoji ? `<span style="font-size:16px;">${folder.coverEmoji}</span> ` : '';
+      const shape = folder.tileShape || 'LANDSCAPE';
+      const sourcesCount = Array.isArray(folder.sources) ? folder.sources.length : 0;
+
+      foldersHtml += `
+        <div class="folder-card">
+          <div class="folder-cover-wrapper">
+            ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="folder-cover-img" alt="${escapeHtml(folder.title)}">` : `<div class="folder-cover-placeholder">📁</div>`}
+            <span class="folder-shape-tag">${shape}</span>
+          </div>
+          <div class="folder-body">
+            <input type="text" class="folder-title-input" value="${escapeHtml(folder.title || 'Pasta')}" 
+                   title="Editar título da pasta"
+                   onchange="window._updateFolderTitle('${cat.id}', '${folder.id}', this.value)">
+            <div class="folder-meta-text">
+              ${emoji}Fontes conectadas: <strong>${sourcesCount}</strong>
+            </div>
+            <div class="folder-actions">
+              <button type="button" class="btn-icon" title="Editar URL da Capa" onclick="window._editFolderCover('${cat.id}', '${folder.id}')">🖼️</button>
+              <button type="button" class="btn-icon delete" title="Remover pasta" onclick="window._deleteFolder('${cat.id}', '${folder.id}')">🗑</button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    card.innerHTML = `
+      <div class="collection-category-header">
+        <div class="category-title-info">
+          <span class="catalog-order-badge">${catIdx + 1}</span>
+          <input type="text" class="category-title-input" value="${escapeHtml(cat.title || 'Categoria')}" 
+                 title="Clique para editar o título da categoria no Nuvio" 
+                 onchange="window._updateCategoryTitle('${cat.id}', this.value)">
+          <span class="category-badge-view">${cat.viewMode || 'TABBED_GRID'}</span>
+          <span class="catalog-tag-type">${folders.length} pasta(s)</span>
+        </div>
+        <div class="category-actions">
+          <button type="button" class="btn btn-secondary btn-small" onclick="window._addFolderToCategory('${cat.id}')">+ Adicionar Pasta</button>
+          <button type="button" class="btn-icon delete" title="Excluir Categoria" onclick="window._deleteCategory('${cat.id}')">🗑</button>
+        </div>
+      </div>
+      <div class="collection-folders-grid">
+        ${foldersHtml || '<div style="padding:16px;color:var(--text-muted);font-size:13px;">Nenhuma pasta nesta categoria.</div>'}
+      </div>
+    `;
+
+    collectionsCategoryList.appendChild(card);
+  });
+}
+
+async function loadSampleCollections() {
+  try {
+    const res = await fetch('/default-nuvio-collections.json');
+    if (res.ok) {
+      state.nuvioCollections = await res.json();
+      renderNuvioCollections();
+      updateManifestUrl();
+      saveToStorage();
+      showToast('Exemplo completo de Coleções Nuvio carregado com sucesso!');
+    }
+  } catch (err) {
+    showToast('Erro ao carregar exemplo.');
+  }
+}
+
+function copyCollectionsJson() {
+  const jsonStr = JSON.stringify(state.nuvioCollections || [], null, 2);
+  navigator.clipboard.writeText(jsonStr).then(() => {
+    showToast('JSON de Coleções do Nuvio copiado!');
+  }).catch(() => {
+    showToast('Erro ao copiar.');
+  });
+}
+
+function downloadCollectionsJson() {
+  const jsonStr = JSON.stringify(state.nuvioCollections || [], null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'collections.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Download do collections.json iniciado!');
+}
+
+function addNewCategory() {
+  const title = prompt('Nome da nova Categoria (ex: "Favoritos VIP", "Estúdios", "Cineclube"):');
+  if (!title || !title.trim()) return;
+
+  const newCat = {
+    id: `cat_${Date.now()}`,
+    title: title.trim(),
+    backdropImageUrl: null,
+    pinToTop: false,
+    focusGlowEnabled: true,
+    viewMode: 'TABBED_GRID',
+    showAllTab: false,
+    folders: []
+  };
+
+  state.nuvioCollections.push(newCat);
+  renderNuvioCollections();
+  updateManifestUrl();
+  saveToStorage();
+  showToast(`Categoria "${newCat.title}" adicionada!`);
+}
+
+function updateCategoryTitle(catId, newTitle) {
+  const cat = state.nuvioCollections.find(c => c.id === catId);
+  if (cat && newTitle.trim()) {
+    cat.title = newTitle.trim();
+    updateManifestUrl();
+    saveToStorage();
+    showToast('Título atualizado!');
+  }
+}
+
+function deleteCategory(catId) {
+  if (!confirm('Deseja excluir esta categoria e todas as suas pastas?')) return;
+  state.nuvioCollections = state.nuvioCollections.filter(c => c.id !== catId);
+  renderNuvioCollections();
+  updateManifestUrl();
+  saveToStorage();
+  showToast('Categoria removida!');
+}
+
+function addFolderToCategory(catId) {
+  const cat = state.nuvioCollections.find(c => c.id === catId);
+  if (!cat) return;
+
+  const title = prompt('Nome da Pasta/Coleção (ex: "Marvel", "Filmes 4K", "Top Animes"):');
+  if (!title || !title.trim()) return;
+
+  const coverUrl = prompt('URL da Imagem de Capa (opcional):', '') || null;
+
+  cat.folders.push({
+    id: `folder_${Date.now()}`,
+    title: title.trim(),
+    coverImageUrl: coverUrl,
+    focusGifUrl: null,
+    focusGifEnabled: true,
+    coverEmoji: '🎬',
+    tileShape: 'LANDSCAPE',
+    hideTitle: true,
+    sources: []
+  });
+
+  renderNuvioCollections();
+  updateManifestUrl();
+  saveToStorage();
+  showToast(`Pasta "${title}" adicionada!`);
+}
+
+function updateFolderTitle(catId, folderId, newTitle) {
+  const cat = state.nuvioCollections.find(c => c.id === catId);
+  if (cat) {
+    const folder = (cat.folders || []).find(f => f.id === folderId);
+    if (folder && newTitle.trim()) {
+      folder.title = newTitle.trim();
+      updateManifestUrl();
+      saveToStorage();
+      showToast('Título da pasta atualizado!');
+    }
+  }
+}
+
+function editFolderCover(catId, folderId) {
+  const cat = state.nuvioCollections.find(c => c.id === catId);
+  if (!cat) return;
+  const folder = (cat.folders || []).find(f => f.id === folderId);
+  if (!folder) return;
+
+  const newUrl = prompt('Informe a nova URL da Capa:', folder.coverImageUrl || '');
+  if (newUrl !== null) {
+    folder.coverImageUrl = newUrl.trim() || null;
+    renderNuvioCollections();
+    updateManifestUrl();
+    saveToStorage();
+    showToast('Capa atualizada!');
+  }
+}
+
+function deleteFolder(catId, folderId) {
+  const cat = state.nuvioCollections.find(c => c.id === catId);
+  if (cat && cat.folders) {
+    cat.folders = cat.folders.filter(f => f.id !== folderId);
+    renderNuvioCollections();
+    updateManifestUrl();
+    saveToStorage();
+    showToast('Pasta removida!');
+  }
+}
+
+function applyJsonCollections() {
+  try {
+    const parsed = JSON.parse(collectionsJsonEditor.value);
+    if (!Array.isArray(parsed)) {
+      throw new Error('O JSON precisa ser um Array de categorias [ { id, title, folders: [...] } ]');
+    }
+    state.nuvioCollections = parsed;
+    jsonEditorFeedback.textContent = '✓ JSON aplicado com sucesso!';
+    jsonEditorFeedback.className = 'feedback-msg success';
+    updateManifestUrl();
+    saveToStorage();
+    showToast('Coleções salvas a partir do JSON!');
+  } catch (err) {
+    jsonEditorFeedback.textContent = `Erro no JSON: ${err.message}`;
+    jsonEditorFeedback.className = 'feedback-msg error';
+  }
+}
+
+window._updateCategoryTitle = updateCategoryTitle;
+window._deleteCategory = deleteCategory;
+window._addFolderToCategory = addFolderToCategory;
+window._updateFolderTitle = updateFolderTitle;
+window._editFolderCover = editFolderCover;
+window._deleteFolder = deleteFolder;
+
 async function updateManifestUrl() {
   const configToEncode = {
     addons: state.addons.map(a => ({
@@ -984,6 +1288,7 @@ async function updateManifestUrl() {
       includeCatalogs: a.includeCatalogs !== false
     })),
     customCatalogs: state.customCatalogs,
+    nuvioCollections: state.nuvioCollections,
     filters: state.filters,
     badgeFormat: state.badgeFormat,
     deduplicate: state.filters.deduplicate
@@ -1067,6 +1372,9 @@ async function loadInitialState() {
           if (Array.isArray(config.customCatalogs)) {
             state.customCatalogs = config.customCatalogs;
           }
+          if (Array.isArray(config.nuvioCollections)) {
+            state.nuvioCollections = config.nuvioCollections;
+          }
           if (config.filters) state.filters = { ...state.filters, ...config.filters };
           if (config.badgeFormat) state.badgeFormat = config.badgeFormat;
           syncDomFromFilters();
@@ -1095,10 +1403,21 @@ async function loadInitialState() {
       if (Array.isArray(parsed.customCatalogs)) {
         state.customCatalogs = parsed.customCatalogs;
       }
+      if (Array.isArray(parsed.nuvioCollections)) {
+        state.nuvioCollections = parsed.nuvioCollections;
+      }
       if (parsed.filters) state.filters = { ...state.filters, ...parsed.filters };
       if (parsed.badgeFormat) state.badgeFormat = parsed.badgeFormat;
       syncDomFromFilters();
       return;
+    }
+  } catch (e) {}
+
+  // 3. Se não tiver coleções salvas, carrega as coleções padrão para o Nuvio
+  try {
+    const defaultColResp = await fetch('/default-nuvio-collections.json');
+    if (defaultColResp.ok) {
+      state.nuvioCollections = await defaultColResp.json();
     }
   } catch (e) {}
 

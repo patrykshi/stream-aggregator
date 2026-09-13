@@ -35,6 +35,10 @@
         <span>📚 Catálogos & Home</span>
         <span class="tab-badge" id="tabCatalogsBadge">0</span>
       </button>
+      <button type="button" class="tab-btn" id="tabBtnCollections" onclick="window.switchTab('collections')">
+        <span>✨ Coleções Nuvio</span>
+        <span class="tab-badge" id="tabCollectionsBadge">0</span>
+      </button>
     </nav>
 
     <!-- Aba 1: Addons e Filtros -->
@@ -221,6 +225,65 @@
             <div class="catalog-items-list" id="catalogItemsList">
               <div class="empty-state" id="catalogEmptyState">
                 Nenhum catálogo configurado ainda. Clique em "🔄 Sincronizar dos Addons" para importar as linhas dos seus addons ativos!
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Aba 3: Coleções Nuvio (Nuvio Collections Studio) -->
+    <div id="tabContentCollections" class="tab-content">
+      <div class="collections-studio">
+        <section class="card">
+          <div class="card-header flex-header">
+            <div>
+              <h2>✨ Central de Coleções para o Nuvio</h2>
+              <p class="card-desc">Crie e edite as coleções no formato nativo do <strong>Nuvio (Categorias, Pastas, Capas, Emojis e Layouts como TABBED_GRID / POSTER / LANDSCAPE)</strong>. Você pode carregar o JSON exemplo ou colar e editar sua estrutura personalizada.</p>
+            </div>
+            <div class="studio-actions">
+              <button type="button" class="btn btn-secondary" id="btnLoadSampleCollections" title="Carregar a estrutura modelo de coleções (Trending, Streaming, Gêneros, Décadas, etc)">
+                📦 Carregar Exemplo Completo
+              </button>
+              <button type="button" class="btn btn-secondary" id="btnCopyCollectionsJson" title="Copiar o JSON completo das coleções">
+                📋 Copiar JSON
+              </button>
+              <button type="button" class="btn btn-secondary" id="btnDownloadCollectionsJson" title="Baixar collections.json para importar no Nuvio">
+                💾 Baixar collections.json
+              </button>
+              <button type="button" class="btn btn-primary" id="btnNewCategory">
+                ✨ + Nova Categoria
+              </button>
+            </div>
+          </div>
+
+          <div class="studio-banner">
+            <div class="banner-icon">📱</div>
+            <div class="banner-text">
+              <strong>Integração com o Nuvio:</strong> O seu agregador disponibiliza a URL <code>/collections.json</code> com este formato completo. Você pode salvar, editar visualmente cada pasta e capa, ou editar diretamente no editor JSON abaixo.
+            </div>
+          </div>
+
+          <!-- Modos de Visualização: Visual / JSON Code -->
+          <div class="collections-mode-toggle">
+            <button type="button" class="btn-mode active" id="btnModeVisual" onclick="window.switchCollectionsMode('visual')">🎨 Editor Visual</button>
+            <button type="button" class="btn-mode" id="btnModeJson" onclick="window.switchCollectionsMode('json')">{ } Editor JSON</button>
+          </div>
+
+          <!-- Vista Visual -->
+          <div id="collectionsVisualView" class="collections-view">
+            <div id="collectionsCategoryList" class="collections-category-list">
+              <!-- Categorias renderizadas via JS -->
+            </div>
+          </div>
+
+          <!-- Vista JSON Raw -->
+          <div id="collectionsJsonView" class="collections-view" style="display:none;">
+            <div class="json-editor-container">
+              <textarea id="collectionsJsonEditor" class="json-textarea" spellcheck="false" placeholder="Cole seu JSON de coleções do Nuvio aqui..."></textarea>
+              <div class="json-editor-actions">
+                <button type="button" class="btn btn-primary" id="btnApplyJsonCollections">✓ Aplicar Alterações do JSON</button>
+                <span id="jsonEditorFeedback" class="feedback-msg"></span>
               </div>
             </div>
           </div>

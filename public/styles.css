@@ -1190,3 +1190,232 @@ body {
   accent-color: var(--primary);
 }
 
+/* ==========================================================================
+   NUVIO COLLECTIONS STUDIO STYLES
+   ========================================================================== */
+.collections-mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  border-radius: 8px;
+  width: fit-content;
+  border: 1px solid var(--card-border);
+}
+
+.btn-mode {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-mode.active {
+  background: var(--primary);
+  color: white;
+}
+
+.collections-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.collection-category-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.collection-category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--card-border);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.category-title-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.category-title-input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  outline: none;
+  transition: var(--transition);
+}
+
+.category-title-input:hover, .category-title-input:focus {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: var(--card-border);
+}
+
+.category-badge-view {
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.category-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collection-folders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.folder-card {
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  position: relative;
+}
+
+.folder-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.folder-cover-wrapper {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  background: #111420;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.folder-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.folder-cover-placeholder {
+  font-size: 32px;
+  color: var(--text-muted);
+}
+
+.folder-shape-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.65);
+  color: #cbd5e1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+}
+
+.folder-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.folder-title-input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.folder-title-input:hover, .folder-title-input:focus {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--card-border);
+  outline: none;
+}
+
+.folder-meta-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.json-editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.json-textarea {
+  width: 100%;
+  height: 520px;
+  background: #0d0e14;
+  color: #38bdf8;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 14px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.json-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.json-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+

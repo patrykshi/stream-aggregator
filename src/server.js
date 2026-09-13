@@ -186,6 +186,14 @@ app.get('/:config/meta/:type/:id.json', async (req, res) => {
   }
 });
 
+// Nuvio Collections Endpoint (Permite importar/exportar a estrutura de coleções no Nuvio)
+app.get('/:config/collections.json', (req, res) => {
+  const { config: rawConfig } = req.params;
+  const config = decodeConfig(rawConfig);
+  res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+  res.json(config.nuvioCollections || []);
+});
+
 // Página de configuração
 app.get('/configure', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
