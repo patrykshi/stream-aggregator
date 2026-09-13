@@ -392,6 +392,121 @@
     </div>
   </div>
 
+  <!-- Modal de Edição de Pasta de Coleção Nuvio -->
+  <div id="nuvioFolderModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 id="nuvioFolderModalTitle">📁 Editar Pasta da Coleção</h3>
+        <button type="button" class="btn-close-modal" id="btnCloseFolderModal">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+        <input type="hidden" id="modalFolderCatId">
+        <input type="hidden" id="modalFolderId">
+
+        <div class="modal-form-group">
+          <label class="section-label" for="modalFolderTitle">Título da Pasta / Hub:</label>
+          <input type="text" id="modalFolderTitle" class="input-text" placeholder="Ex: 🔥 Em Alta, Marvel, Netflix, Terror">
+        </div>
+
+        <div class="filter-row">
+          <div class="filter-col">
+            <label class="section-label" for="modalFolderEmoji">Emoji / Ícone:</label>
+            <input type="text" id="modalFolderEmoji" class="input-text" placeholder="Ex: 🎬, 🔥, 🍿, ⏳">
+          </div>
+          <div class="filter-col">
+            <label class="section-label" for="modalFolderTileShape">Formato do Card (Tile Shape):</label>
+            <select id="modalFolderTileShape" class="select-input">
+              <option value="LANDSCAPE">Landscape (16:9 Banner Horizontal)</option>
+              <option value="POSTER">Poster (2:3 Cartaz Vertical)</option>
+              <option value="SQUARE">Square (1:1 Quadrado)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Capas e Imagens / Artwork -->
+        <div class="modal-form-group">
+          <label class="section-label" for="modalFolderCoverUrl">URL da Imagem de Capa (Cover Image):</label>
+          <input type="text" id="modalFolderCoverUrl" class="input-text" placeholder="https://exemplo.com/poster.jpg">
+          <div class="artwork-presets-box">
+            <span style="font-size:11px;color:var(--text-muted);">Presets Populares:</span>
+            <div class="preset-buttons" style="margin-top:4px;">
+              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/streaming_services.netflix.webp')">Netflix</button>
+              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/streaming_services.prime_video.webp')">Prime</button>
+              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/streaming_services.disney_plus.webp')">Disney+</button>
+              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/streaming_services.hbo_max.webp')">HBO Max</button>
+              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/studios.marvel.webp?v=7')">Marvel</button>
+              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/studios.dc.webp?v=7')">DC</button>
+              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/studios.pixar.webp?v=7')">Pixar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Animação GIF / Focus Effect -->
+        <div class="modal-form-group">
+          <label class="section-label" for="modalFolderFocusGifUrl">URL de Animação em Foco (Focus GIF URL):</label>
+          <input type="text" id="modalFolderFocusGifUrl" class="input-text" placeholder="https://exemplo.com/animacao.gif">
+          <small class="help-text">Ao passar o cursor/controle no Nuvio, reproduz esse GIF animado.</small>
+        </div>
+
+        <div class="checkbox-group" style="margin-top: 4px;">
+          <label class="checkbox-label"><input type="checkbox" id="modalFolderFocusGifEnabled" checked> <span>Habilitar Animação em Foco (Focus GIF Enabled)</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="modalFolderHideTitle" checked> <span>Ocultar Texto se a Capa já tiver Título</span></label>
+        </div>
+
+        <!-- Fontes e Catálogos Vinculados -->
+        <div class="modal-form-group" style="margin-top: 10px;">
+          <div class="flex-between">
+            <label class="section-label">Fontes & Catálogos Conectados a esta Pasta:</label>
+            <span class="catalog-tag-type" id="modalFolderSourcesCount">0 fontes</span>
+          </div>
+          <small class="help-text">Selecione quais catálogos dos seus addons ativos alimentarão esta pasta no Nuvio:</small>
+          <div class="folder-sources-checklist" id="folderSourcesChecklist">
+            <!-- Checkboxes preenchidos via JS -->
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btnCancelFolderModal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnSaveFolderModal">💾 Salvar Pasta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Edição de Categoria Nuvio -->
+  <div id="nuvioCategoryModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 id="nuvioCatModalTitle">🏷️ Configurar Categoria</h3>
+        <button type="button" class="btn-close-modal" id="btnCloseCatModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modalCatId">
+        <div class="modal-form-group">
+          <label class="section-label" for="modalCatTitle">Nome da Categoria:</label>
+          <input type="text" id="modalCatTitle" class="input-text" placeholder="Ex: Streaming, Gêneros, Estúdios">
+        </div>
+        <div class="modal-form-group">
+          <label class="section-label" for="modalCatViewMode">Modo de Visualização (View Mode):</label>
+          <select id="modalCatViewMode" class="select-input">
+            <option value="TABBED_GRID">TABBED_GRID (Abas Superiores + Grid)</option>
+            <option value="ROW">ROW (Carrossel Horizontal de Linhas)</option>
+            <option value="GRID">GRID (Grade Direta)</option>
+          </select>
+        </div>
+        <div class="checkbox-group">
+          <label class="checkbox-label"><input type="checkbox" id="modalCatFocusGlow" checked> <span>Efeito de Brilho em Foco (Focus Glow)</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="modalCatPinToTop"> <span>Fixar no Topo da Tela (Pin to Top)</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="modalCatShowAllTab"> <span>Exibir Aba "Ver Tudo" (Show All Tab)</span></label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btnCancelCatModal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnSaveCatModal">💾 Salvar Categoria</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast notification -->
   <div id="toast" class="toast"></div>
 
