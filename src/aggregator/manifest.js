@@ -2,7 +2,7 @@ import { buildCatalogId } from './catalogs.js';
 
 /**
  * Gera o manifest.json compatível com o Stremio para uma dada configuração,
- * incluindo dinamicamente recursos de stream, legendas e catálogos.
+ * incluindo dinamicamente recursos de stream, legendas e catálogos (com suporte a customCatalogs e mesclagem).
  */
 export function generateManifest(config = {}) {
   const activeAddons = (config.addons || []).filter(a => a.enabled !== false);
@@ -13,19 +13,38 @@ export function generateManifest(config = {}) {
   const hasMeta = activeAddons.some(a => (a.resources || ['stream']).includes('meta'));
 
   // Compila catálogos
-  const aggregatedCatalogs = [];
-  activeAddons.forEach((addon, idx) => {
-    if (addon.includeCatalogs !== false && Array.isArray(addon.catalogs) && addon.catalogs.length > 0) {
-      addon.catalogs.forEach(cat => {
-        aggregatedCatalogs.push({
-          type: cat.type || 'movie',
-          id: buildCatalogId(idx, cat.id),
-          name: `[${addon.name}] ${cat.name || cat.id}`,
-          extra: cat.extra || [{ name: 'skip', isRequired: false }]
-        });
+  let aggregatedCatalogs = [];
+
+  if (Array.isArray(config.customCatalogs) && config.customCatalogs.length > 0) {
+    // Utiliza a ordenação e customizações definidas pelo usuário na tela de Catálogos
+    config.customCatalogs.forEach(cat => {
+      if (cat.enabled === false) return;
+
+      const id = cat.isMerged ? `merged__${cat.id}` : cat.id;
+      const displayName = cat.customName ? cat.customName.trim() : cat.name;
+
+      aggregatedCatalogs.push({
+        type: cat.type || 'movie',
+        id,
+        name: displayName,
+        extra: cat.extra || [{ name: 'skip', isRequired: false }]
       });
-    }
-  });
+    });
+  } else {
+    // Fallback padrão: compila automaticamente de cada addon ativo
+    activeAddons.forEach((addon, idx) => {
+      if (addon.includeCatalogs !== false && Array.isArray(addon.catalogs) && addon.catalogs.length > 0) {
+        addon.catalogs.forEach(cat => {
+          aggregatedCatalogs.push({
+            type: cat.type || 'movie',
+            id: buildCatalogId(idx, cat.id),
+            name: `[${addon.name}] ${cat.name || cat.id}`,
+            extra: cat.extra || [{ name: 'skip', isRequired: false }]
+          });
+        });
+      }
+    });
+  }
 
   const resources = [
     {
@@ -57,7 +76,7 @@ export function generateManifest(config = {}) {
 
   return {
     id: 'community.streamaggregator.unified',
-    version: '1.2.0',
+    version: '1.3.0',
     name: 'Unified Stream Aggregator',
     description,
     logo: 'https://cdn-icons-png.flaticon.com/512/3845/3845868.png',

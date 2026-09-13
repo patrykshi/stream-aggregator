@@ -25,9 +25,23 @@
       </div>
     </header>
 
-    <main class="content-grid">
-      <!-- Coluna Esquerda: Addons & Provedores -->
-      <section class="card">
+    <!-- Navegação por Abas -->
+    <nav class="tabs-nav">
+      <button type="button" class="tab-btn active" id="tabBtnAddons" onclick="window.switchTab('addons')">
+        <span>⚡ Provedores & Streams</span>
+        <span class="tab-badge" id="tabAddonsBadge">0</span>
+      </button>
+      <button type="button" class="tab-btn" id="tabBtnCatalogs" onclick="window.switchTab('catalogs')">
+        <span>📚 Catálogos & Home</span>
+        <span class="tab-badge" id="tabCatalogsBadge">0</span>
+      </button>
+    </nav>
+
+    <!-- Aba 1: Addons e Filtros -->
+    <div id="tabContentAddons" class="tab-content active">
+      <main class="content-grid">
+        <!-- Coluna Esquerda: Addons & Provedores -->
+        <section class="card">
         <div class="card-header">
           <h2>1. Provedores de Streaming</h2>
           <span class="badge-count" id="addonCountBadge">0 configurados</span>
@@ -168,11 +182,99 @@
         </section>
       </div>
     </main>
+    </div>
+
+    <!-- Aba 2: Catálogos & Home Studio -->
+    <div id="tabContentCatalogs" class="tab-content">
+      <div class="catalogs-studio">
+        <!-- Topo da Central de Catálogos -->
+        <section class="card">
+          <div class="card-header flex-header">
+            <div>
+              <h2>📚 Studio de Catálogos & Tela Inicial</h2>
+              <p class="card-desc">Gerencie as linhas de filmes e séries que aparecem na tela inicial do Stremio. Reordene, renomeie, desative ou <strong>mescle catálogos de diferentes addons em uma única linha inteligente</strong>.</p>
+            </div>
+            <div class="studio-actions">
+              <button type="button" class="btn btn-secondary" id="btnSyncCatalogs" title="Importar os catálogos dos addons cadastrados">
+                🔄 Sincronizar dos Addons
+              </button>
+              <button type="button" class="btn btn-primary" id="btnNewMergedCatalog">
+                ✨ + Criar Catálogo Mesclado
+              </button>
+            </div>
+          </div>
+
+          <!-- Dica explicativa -->
+          <div class="studio-banner">
+            <div class="banner-icon">💡</div>
+            <div class="banner-text">
+              <strong>Como funciona o Catálogo Mesclado:</strong> Selecione fontes como CyberFlix + Cinemeta + Torrentio. O agregador faz uma busca paralela nas fontes selecionadas, intercala os lançamentos e elimina qualquer duplicidade automaticamente!
+            </div>
+          </div>
+
+          <!-- Lista de Catálogos -->
+          <div class="catalog-list-container" id="catalogListContainer">
+            <div class="catalog-list-header">
+              <span>Ordem & Nome de Exibição</span>
+              <span>Ações & Prioridade</span>
+            </div>
+            <div class="catalog-items-list" id="catalogItemsList">
+              <div class="empty-state" id="catalogEmptyState">
+                Nenhum catálogo configurado ainda. Clique em "🔄 Sincronizar dos Addons" para importar as linhas dos seus addons ativos!
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
       <p>Stream Aggregator • Compatível com Stremio v2 API, Nuvio e HTTP Players</p>
     </footer>
+  </div>
+
+  <!-- Modal de Criação/Edição de Catálogo Mesclado -->
+  <div id="mergedCatalogModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalMergedTitle">✨ Criar Catálogo Mesclado</h3>
+        <button type="button" class="btn-close-modal" id="btnCloseMergedModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modalMergedId">
+
+        <div class="modal-form-group">
+          <label class="section-label" for="modalMergedName">Nome do Catálogo Unificado:</label>
+          <input type="text" id="modalMergedName" class="input-text" placeholder="Ex: 🔥 Super Populares (CyberFlix + Cinemeta)">
+          <small class="help-text">Esse é o nome da seção que aparecerá na tela inicial do Stremio.</small>
+        </div>
+
+        <div class="modal-form-group">
+          <label class="section-label" for="modalMergedType">Tipo de Mídia:</label>
+          <select id="modalMergedType" class="select-input">
+            <option value="movie">Filmes (movie)</option>
+            <option value="series">Séries (series)</option>
+            <option value="anime">Animes (anime)</option>
+            <option value="other">Outros (other)</option>
+          </select>
+        </div>
+
+        <div class="modal-form-group">
+          <label class="section-label">Selecione os Catálogos Fonte para Mesclar:</label>
+          <div class="merged-sources-checklist" id="mergedSourcesChecklist">
+            <!-- Gerado via Javascript dinamicamente -->
+          </div>
+          <small class="help-text">Os itens desses catálogos serão intercalados (round-robin) e deduplicados por ID do IMDb/TMDB.</small>
+        </div>
+
+        <div id="modalMergedFeedback" class="feedback-msg"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btnCancelMergedModal" class="btn btn-secondary">Cancelar</button>
+        <button type="button" id="btnSaveMergedModal" class="btn btn-primary">Salvar Catálogo Mesclado</button>
+      </div>
+    </div>
   </div>
 
   <!-- Modal de Configurações do Addon (Engrenagem ⚙️) -->

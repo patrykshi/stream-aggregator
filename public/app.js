@@ -1,6 +1,7 @@
 // Estado da aplicação
 const state = {
   addons: [],
+  customCatalogs: [],
   filters: {
     resolutions: ['4k', '1080p', '720p', '480p'],
     removeCams: true,
@@ -13,7 +14,15 @@ const state = {
   badgeFormat: 'addon'
 };
 
-// Elementos DOM
+// Elementos DOM - Abas
+const tabBtnAddons = document.getElementById('tabBtnAddons');
+const tabBtnCatalogs = document.getElementById('tabBtnCatalogs');
+const tabContentAddons = document.getElementById('tabContentAddons');
+const tabContentCatalogs = document.getElementById('tabContentCatalogs');
+const tabAddonsBadge = document.getElementById('tabAddonsBadge');
+const tabCatalogsBadge = document.getElementById('tabCatalogsBadge');
+
+// Elementos DOM - Provedores
 const addonUrlInput = document.getElementById('addonUrlInput');
 const addonNameInput = document.getElementById('addonNameInput');
 const btnAddAddon = document.getElementById('btnAddAddon');
@@ -22,6 +31,24 @@ const addAddonFeedback = document.getElementById('addAddonFeedback');
 const addonListEl = document.getElementById('addonList');
 const emptyStateEl = document.getElementById('emptyState');
 const addonCountBadge = document.getElementById('addonCountBadge');
+
+// Elementos DOM - Catálogos Studio
+const btnSyncCatalogs = document.getElementById('btnSyncCatalogs');
+const btnNewMergedCatalog = document.getElementById('btnNewMergedCatalog');
+const catalogItemsList = document.getElementById('catalogItemsList');
+const catalogEmptyState = document.getElementById('catalogEmptyState');
+
+// Elementos DOM - Modal Catálogo Mesclado
+const mergedCatalogModal = document.getElementById('mergedCatalogModal');
+const btnCloseMergedModal = document.getElementById('btnCloseMergedModal');
+const btnCancelMergedModal = document.getElementById('btnCancelMergedModal');
+const btnSaveMergedModal = document.getElementById('btnSaveMergedModal');
+const modalMergedId = document.getElementById('modalMergedId');
+const modalMergedTitle = document.getElementById('modalMergedTitle');
+const modalMergedName = document.getElementById('modalMergedName');
+const modalMergedType = document.getElementById('modalMergedType');
+const mergedSourcesChecklist = document.getElementById('mergedSourcesChecklist');
+const modalMergedFeedback = document.getElementById('modalMergedFeedback');
 
 // Filtros DOM
 const res4k = document.getElementById('res4k');
@@ -47,7 +74,7 @@ const btnCopyUrl = document.getElementById('btnCopyUrl');
 const manifestUrlDisplay = document.getElementById('manifestUrlDisplay');
 const toastEl = document.getElementById('toast');
 
-// Modal DOM
+// Modal DOM - Addon Settings
 const addonSettingsModal = document.getElementById('addonSettingsModal');
 const btnCloseModal = document.getElementById('btnCloseModal');
 const modalAddonId = document.getElementById('modalAddonId');
@@ -66,9 +93,25 @@ const btnModalCopyUrl = document.getElementById('btnModalCopyUrl');
 window.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   setupModalListeners();
+  setupCatalogStudioListeners();
   await loadInitialState();
   render();
 });
+
+function switchTab(tab) {
+  if (tab === 'addons') {
+    tabBtnAddons.classList.add('active');
+    tabBtnCatalogs.classList.remove('active');
+    tabContentAddons.classList.add('active');
+    tabContentCatalogs.classList.remove('active');
+  } else {
+    tabBtnAddons.classList.remove('active');
+    tabBtnCatalogs.classList.add('active');
+    tabContentAddons.classList.remove('active');
+    tabContentCatalogs.classList.add('active');
+  }
+}
+window.switchTab = switchTab;
 
 function setupEventListeners() {
   // Preset buttons
@@ -381,6 +424,7 @@ function toggleAddon(id) {
 
 function render() {
   renderAddonList();
+  renderCatalogStudio();
   updateManifestUrl();
 }
 
@@ -388,6 +432,7 @@ function renderAddonList() {
   addonListEl.innerHTML = '';
   const count = state.addons.length;
   addonCountBadge.textContent = `${count} configurado${count === 1 ? '' : 's'}`;
+  if (tabAddonsBadge) tabAddonsBadge.textContent = count;
 
   if (count === 0) {
     addonListEl.appendChild(emptyStateEl);
@@ -458,6 +503,303 @@ window._moveAddon = moveAddon;
 window._removeAddon = removeAddon;
 window._toggleAddon = toggleAddon;
 
+// ==========================================================================
+// STUDIO DE CATÁLOGOS - FUNÇÕES & EVENTOS
+// ==========================================================================
+
+function setupCatalogStudioListeners() {
+  btnSyncCatalogs.addEventListener('click', syncCatalogsFromAddons);
+  btnNewMergedCatalog.addEventListener('click', () => openMergedCatalogModal());
+
+  btnCloseMergedModal.addEventListener('click', closeMergedModal);
+  btnCancelMergedModal.addEventListener('click', closeMergedModal);
+  mergedCatalogModal.addEventListener('click', (e) => {
+    if (e.target === mergedCatalogModal) closeMergedModal();
+  });
+
+  btnSaveMergedModal.addEventListener('click', saveMergedCatalog);
+}
+
+/**
+ * Sincroniza os catálogos encontrados em todos os addons para o array `state.customCatalogs`.
+ * Mantém eventuais catálogos mesclados e customizações já existentes.
+ */
+function syncCatalogsFromAddons() {
+  const existingMerged = state.customCatalogs.filter(c => c.isMerged);
+  const newCustomCatalogs = [...existingMerged];
+
+  let addedCount = 0;
+  state.addons.forEach((addon, addonIdx) => {
+    if (addon.enabled === false || addon.includeCatalogs === false) return;
+    if (!Array.isArray(addon.catalogs) || addon.catalogs.length === 0) return;
+
+    addon.catalogs.forEach(cat => {
+      const namespacedId = `a${addonIdx}__${cat.id}`;
+      // Verifica se já existe
+      const existing = state.customCatalogs.find(c => c.id === namespacedId || (!c.isMerged && c.originalId === cat.id && c.addonUrl === addon.url));
+
+      if (existing) {
+        // Preserva ID e nome customizado
+        newCustomCatalogs.push({
+          ...existing,
+          id: namespacedId,
+          addonName: addon.name,
+          addonUrl: addon.url,
+          originalId: cat.id,
+          name: `[${addon.name}] ${cat.name || cat.id}`,
+          type: cat.type || 'movie'
+        });
+      } else {
+        newCustomCatalogs.push({
+          id: namespacedId,
+          addonName: addon.name,
+          addonUrl: addon.url,
+          originalId: cat.id,
+          name: `[${addon.name}] ${cat.name || cat.id}`,
+          customName: '',
+          type: cat.type || 'movie',
+          enabled: true,
+          isMerged: false,
+          sourceCatalogIds: []
+        });
+        addedCount++;
+      }
+    });
+  });
+
+  state.customCatalogs = newCustomCatalogs;
+  renderCatalogStudio();
+  updateManifestUrl();
+  saveToStorage();
+  showToast(`Catálogos sincronizados! Total: ${state.customCatalogs.length}`);
+}
+
+function renderCatalogStudio() {
+  catalogItemsList.innerHTML = '';
+  const list = state.customCatalogs || [];
+  if (tabCatalogsBadge) tabCatalogsBadge.textContent = list.length;
+
+  if (list.length === 0) {
+    catalogItemsList.appendChild(catalogEmptyState);
+    catalogEmptyState.style.display = 'block';
+    return;
+  }
+
+  catalogEmptyState.style.display = 'none';
+
+  list.forEach((cat, idx) => {
+    const card = document.createElement('div');
+    card.className = `catalog-item-card ${!cat.enabled ? 'disabled' : ''} ${cat.isMerged ? 'is-merged' : ''}`;
+
+    const isFirst = idx === 0;
+    const isLast = idx === list.length - 1;
+
+    const displayName = cat.customName ? cat.customName : cat.name;
+    const typeLabel = cat.type === 'series' ? 'Série' : (cat.type === 'movie' ? 'Filme' : cat.type);
+
+    let badgeHtml = '';
+    let subInfoHtml = '';
+
+    if (cat.isMerged) {
+      const srcCount = Array.isArray(cat.sourceCatalogIds) ? cat.sourceCatalogIds.length : 0;
+      badgeHtml = `<span class="catalog-tag-merged">Mesclado</span>`;
+      subInfoHtml = `<span>Mesclando ${srcCount} catálogo(s) com deduplicação inteligente</span>`;
+    } else {
+      subInfoHtml = `<span>Addon: <strong>${escapeHtml(cat.addonName || 'Addon')}</strong></span>`;
+    }
+
+    card.innerHTML = `
+      <div class="catalog-left-info">
+        <span class="catalog-order-badge">${idx + 1}</span>
+        <div class="catalog-title-wrapper">
+          <input type="text" class="catalog-inline-name" value="${escapeHtml(displayName)}" 
+                 title="Clique para editar o título no Stremio" 
+                 onchange="window._changeCatalogName('${cat.id}', this.value)" 
+                 placeholder="Nome de exibição">
+          <div class="catalog-meta-sub">
+            ${badgeHtml}
+            <span class="catalog-tag-type">${typeLabel}</span>
+            ${subInfoHtml}
+          </div>
+        </div>
+      </div>
+      <div class="catalog-right-actions">
+        ${cat.isMerged ? `<button type="button" class="btn-icon" title="Editar fontes da mescla" onclick="window._editMergedCatalog('${cat.id}')">✏️</button>` : ''}
+        <button type="button" class="btn-icon" title="Subir na tela inicial" ${isFirst ? 'disabled style="opacity:0.25"' : ''} onclick="window._moveCatalog('${cat.id}', -1)">↑</button>
+        <button type="button" class="btn-icon" title="Descer na tela inicial" ${isLast ? 'disabled style="opacity:0.25"' : ''} onclick="window._moveCatalog('${cat.id}', 1)">↓</button>
+        <button type="button" class="btn-icon" title="${cat.enabled ? 'Desativar na home' : 'Ativar na home'}" onclick="window._toggleCatalog('${cat.id}')">
+          ${cat.enabled ? '✓' : '✗'}
+        </button>
+        ${cat.isMerged ? `<button type="button" class="btn-icon delete" title="Excluir catálogo mesclado" onclick="window._deleteCatalog('${cat.id}')">🗑</button>` : ''}
+      </div>
+    `;
+
+    catalogItemsList.appendChild(card);
+  });
+}
+
+function changeCatalogName(catId, newName) {
+  const cat = state.customCatalogs.find(c => c.id === catId);
+  if (cat) {
+    cat.customName = newName.trim();
+    updateManifestUrl();
+    saveToStorage();
+    showToast(`Título atualizado para "${cat.customName || cat.name}"!`);
+  }
+}
+
+function moveCatalog(catId, direction) {
+  const index = state.customCatalogs.findIndex(c => c.id === catId);
+  if (index < 0) return;
+
+  const targetIndex = index + direction;
+  if (targetIndex < 0 || targetIndex >= state.customCatalogs.length) return;
+
+  const [item] = state.customCatalogs.splice(index, 1);
+  state.customCatalogs.splice(targetIndex, 0, item);
+
+  renderCatalogStudio();
+  updateManifestUrl();
+  saveToStorage();
+}
+
+function toggleCatalog(catId) {
+  const cat = state.customCatalogs.find(c => c.id === catId);
+  if (cat) {
+    cat.enabled = !cat.enabled;
+    renderCatalogStudio();
+    updateManifestUrl();
+    saveToStorage();
+  }
+}
+
+function deleteCatalog(catId) {
+  state.customCatalogs = state.customCatalogs.filter(c => c.id !== catId);
+  renderCatalogStudio();
+  updateManifestUrl();
+  saveToStorage();
+  showToast('Catálogo mesclado removido!');
+}
+
+function openMergedCatalogModal(editId = null) {
+  modalMergedFeedback.textContent = '';
+  modalMergedFeedback.className = 'feedback-msg';
+
+  // Obter todos os catálogos normais disponíveis para mesclar
+  const availableSources = [];
+  state.addons.forEach((addon, aIdx) => {
+    if (addon.enabled === false || addon.includeCatalogs === false) return;
+    if (!Array.isArray(addon.catalogs)) return;
+    addon.catalogs.forEach(cat => {
+      const namespacedId = `a${aIdx}__${cat.id}`;
+      availableSources.push({
+        id: namespacedId,
+        name: `[${addon.name}] ${cat.name || cat.id}`,
+        type: cat.type || 'movie'
+      });
+    });
+  });
+
+  if (availableSources.length === 0) {
+    showToast('Nenhum catálogo disponível nos addons para mesclar. Adicione addons com catálogos primeiro!');
+    return;
+  }
+
+  let currentSelectedIds = [];
+
+  if (editId) {
+    const cat = state.customCatalogs.find(c => c.id === editId);
+    if (!cat) return;
+    modalMergedId.value = cat.id;
+    modalMergedTitle.textContent = '✏️ Editar Catálogo Mesclado';
+    modalMergedName.value = cat.customName || cat.name;
+    modalMergedType.value = cat.type || 'movie';
+    currentSelectedIds = Array.isArray(cat.sourceCatalogIds) ? cat.sourceCatalogIds : [];
+  } else {
+    modalMergedId.value = '';
+    modalMergedTitle.textContent = '✨ Criar Catálogo Mesclado';
+    modalMergedName.value = '🔥 Super Populares Unificados';
+    modalMergedType.value = 'movie';
+  }
+
+  // Renderizar checkboxes de fontes
+  mergedSourcesChecklist.innerHTML = '';
+  availableSources.forEach(src => {
+    const isChecked = currentSelectedIds.includes(src.id);
+    const label = document.createElement('label');
+    label.className = 'merged-source-item';
+    label.innerHTML = `
+      <input type="checkbox" value="${src.id}" data-type="${src.type}" ${isChecked ? 'checked' : ''}>
+      <span>${escapeHtml(src.name)} <small style="color:var(--text-muted)">(${src.type})</small></span>
+    `;
+    mergedSourcesChecklist.appendChild(label);
+  });
+
+  mergedCatalogModal.classList.add('show');
+}
+
+function closeMergedModal() {
+  mergedCatalogModal.classList.remove('show');
+}
+
+function saveMergedCatalog() {
+  const name = modalMergedName.value.trim();
+  const type = modalMergedType.value;
+  const id = modalMergedId.value;
+
+  if (!name) {
+    modalMergedFeedback.textContent = 'Por favor, dê um nome ao catálogo mesclado.';
+    modalMergedFeedback.className = 'feedback-msg error';
+    return;
+  }
+
+  // Coleta os IDs selecionados
+  const checkedBoxes = mergedSourcesChecklist.querySelectorAll('input[type="checkbox"]:checked');
+  const sourceCatalogIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+  if (sourceCatalogIds.length < 2) {
+    modalMergedFeedback.textContent = 'Selecione pelo menos 2 catálogos para mesclar.';
+    modalMergedFeedback.className = 'feedback-msg error';
+    return;
+  }
+
+  if (id) {
+    // Editando existente
+    const cat = state.customCatalogs.find(c => c.id === id);
+    if (cat) {
+      cat.name = name;
+      cat.customName = name;
+      cat.type = type;
+      cat.sourceCatalogIds = sourceCatalogIds;
+    }
+  } else {
+    // Criando novo
+    const newId = `merged_${Date.now()}`;
+    state.customCatalogs.unshift({
+      id: newId,
+      name,
+      customName: name,
+      type,
+      enabled: true,
+      isMerged: true,
+      sourceCatalogIds,
+      extra: [{ name: 'skip', isRequired: false }]
+    });
+  }
+
+  renderCatalogStudio();
+  updateManifestUrl();
+  saveToStorage();
+  closeMergedModal();
+  showToast(`Catálogo mesclado "${name}" salvo com sucesso!`);
+}
+
+window._changeCatalogName = changeCatalogName;
+window._moveCatalog = moveCatalog;
+window._toggleCatalog = toggleCatalog;
+window._deleteCatalog = deleteCatalog;
+window._editMergedCatalog = (id) => openMergedCatalogModal(id);
+
 async function updateManifestUrl() {
   const configToEncode = {
     addons: state.addons.map(a => ({
@@ -469,6 +811,7 @@ async function updateManifestUrl() {
       catalogs: a.catalogs || [],
       includeCatalogs: a.includeCatalogs !== false
     })),
+    customCatalogs: state.customCatalogs,
     filters: state.filters,
     badgeFormat: state.badgeFormat,
     deduplicate: state.filters.deduplicate
@@ -549,6 +892,9 @@ async function loadInitialState() {
             includeCatalogs: a.includeCatalogs !== false,
             status: 'online'
           }));
+          if (Array.isArray(config.customCatalogs)) {
+            state.customCatalogs = config.customCatalogs;
+          }
           if (config.filters) state.filters = { ...state.filters, ...config.filters };
           if (config.badgeFormat) state.badgeFormat = config.badgeFormat;
           syncDomFromFilters();
@@ -574,6 +920,9 @@ async function loadInitialState() {
           includeCatalogs: a.includeCatalogs !== false
         }));
       }
+      if (Array.isArray(parsed.customCatalogs)) {
+        state.customCatalogs = parsed.customCatalogs;
+      }
       if (parsed.filters) state.filters = { ...state.filters, ...parsed.filters };
       if (parsed.badgeFormat) state.badgeFormat = parsed.badgeFormat;
       syncDomFromFilters();
@@ -583,3 +932,4 @@ async function loadInitialState() {
 
   syncDomFromFilters();
 }
+

@@ -21,9 +21,72 @@ export function parseCatalogId(namespacedId) {
 }
 
 /**
- * Encaminha a consulta de catálogo para o addon correspondente.
+ * Intercala e desduplica listas de itens de múltiplos catálogos (round-robin).
+ */
+export function mergeAndDeduplicateMetas(metasArrays) {
+  if (!Array.isArray(metasArrays) || metasArrays.length === 0) {
+    return [];
+  }
+
+  const seenIds = new Set();
+  const merged = [];
+
+  // Encontra o tamanho máximo de lista
+  const maxLen = Math.max(...metasArrays.map(arr => (Array.isArray(arr) ? arr.length : 0)));
+
+  for (let i = 0; i < maxLen; i++) {
+    for (const arr of metasArrays) {
+      if (Array.isArray(arr) && i < arr.length) {
+        const item = arr[i];
+        if (!item) continue;
+
+        const uniqueKey = item.id || item.imdb_id;
+        if (uniqueKey) {
+          const lowerKey = String(uniqueKey).toLowerCase();
+          if (seenIds.has(lowerKey)) continue;
+          seenIds.add(lowerKey);
+        }
+
+        merged.push(item);
+      }
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Encaminha a consulta de catálogo para o addon correspondente ou processa catálogo mesclado.
  */
 export async function fetchCatalog(config, type, namespacedId, extra = '') {
+  // 1. Catálogo Mesclado (Merged Catalog)
+  if (String(namespacedId).startsWith('merged__')) {
+    const mergedId = String(namespacedId).replace('merged__', '');
+    const customCatalogs = config.customCatalogs || [];
+    const mergedConfig = customCatalogs.find(c => c.id === mergedId || c.id === namespacedId);
+
+    if (!mergedConfig || !Array.isArray(mergedConfig.sourceCatalogIds) || mergedConfig.sourceCatalogIds.length === 0) {
+      console.warn(`[Catalog Merged] Catálogo mesclado "${namespacedId}" não encontrado ou sem fontes.`);
+      return { metas: [] };
+    }
+
+    console.log(`[Catalog Merged] Consultando ${mergedConfig.sourceCatalogIds.length} fontes para "${mergedConfig.name}"...`);
+
+    const promises = mergedConfig.sourceCatalogIds.map(srcId =>
+      fetchCatalog(config, type, srcId, extra).then(res => res.metas || []).catch(() => [])
+    );
+
+    const settled = await Promise.allSettled(promises);
+    const validArrays = settled
+      .filter(s => s.status === 'fulfilled' && Array.isArray(s.value))
+      .map(s => s.value);
+
+    const mergedMetas = mergeAndDeduplicateMetas(validArrays);
+    console.log(`[Catalog Merged] Total consolidado: ${mergedMetas.length} itens.`);
+    return { metas: mergedMetas };
+  }
+
+  // 2. Catálogo Normal de Addon
   const { addonIndex, originalId } = parseCatalogId(namespacedId);
   const addons = config.addons || [];
 
@@ -104,4 +167,3 @@ export async function fetchMeta(config, type, id) {
 
   return { meta: null };
 }
-

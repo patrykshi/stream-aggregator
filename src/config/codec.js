@@ -51,6 +51,7 @@ export function decodeConfig(rawToken) {
 export function getDefaultConfig() {
   return {
     addons: [],
+    customCatalogs: [],
     filters: {
       resolutions: ['4k', '1080p', '720p', '480p'],
       removeCams: true,
@@ -82,6 +83,19 @@ export function sanitizeConfig(cfg) {
         }))
     : [];
 
+  const customCatalogs = Array.isArray(cfg.customCatalogs)
+    ? cfg.customCatalogs.map((c, idx) => ({
+        id: String(c.id || `cat_${idx}`),
+        name: String(c.name || 'Catálogo'),
+        customName: typeof c.customName === 'string' ? c.customName : '',
+        type: String(c.type || 'movie'),
+        enabled: c.enabled !== false,
+        isMerged: Boolean(c.isMerged),
+        sourceCatalogIds: Array.isArray(c.sourceCatalogIds) ? c.sourceCatalogIds : [],
+        extra: Array.isArray(c.extra) ? c.extra : [{ name: 'skip', isRequired: false }]
+      }))
+    : [];
+
   const filters = {
     resolutions: Array.isArray(cfg.filters?.resolutions)
       ? cfg.filters.resolutions.map(r => String(r).toLowerCase())
@@ -97,6 +111,7 @@ export function sanitizeConfig(cfg) {
 
   return {
     addons,
+    customCatalogs,
     filters,
     badgeFormat: ['addon', 'clean', 'none'].includes(cfg.badgeFormat) ? cfg.badgeFormat : 'addon',
     deduplicate: cfg.deduplicate !== false
