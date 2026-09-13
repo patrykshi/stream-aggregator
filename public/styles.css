@@ -915,22 +915,62 @@ body {
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
   gap: 12px;
-  transition: var(--transition);
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  user-select: none;
 }
 
 .catalog-item-card:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.catalog-item-card.dragging {
+  opacity: 0.35;
+  transform: scale(0.98);
+  border: 1px dashed var(--primary);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.catalog-item-card.drag-over {
+  border-top: 3px solid #6366f1;
+  background: rgba(99, 102, 241, 0.15);
 }
 
 .catalog-item-card.disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   border-style: dashed;
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .catalog-item-card.is-merged {
   border-color: rgba(168, 85, 247, 0.4);
   background: linear-gradient(90deg, rgba(168, 85, 247, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+}
+
+.catalog-item-card.is-favorite {
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.1);
+}
+
+.catalog-drag-handle {
+  font-size: 18px;
+  color: var(--text-muted);
+  cursor: grab;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.catalog-drag-handle:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.catalog-drag-handle:active {
+  cursor: grabbing;
 }
 
 .catalog-left-info {
@@ -1010,7 +1050,113 @@ body {
 .catalog-right-actions {
   display: flex;
   align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Botões de Ação com Alto Destaque e Visibilidade */
+.btn-action-badge {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-action-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.btn-icon-symbol {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.btn-label-text {
+  font-size: 11px;
+  letter-spacing: 0.2px;
+}
+
+/* Estado Ativo: Favorito */
+.btn-action-badge.active-fav {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #fbbf24;
+}
+
+.btn-action-badge.active-fav:hover {
+  background: rgba(245, 158, 11, 0.28);
+}
+
+/* Estado Ativo: Home */
+.btn-action-badge.active-home {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.55);
+  color: #93c5fd;
+}
+
+.btn-action-badge.active-home:hover {
+  background: rgba(59, 130, 246, 0.28);
+}
+
+.btn-action-badge.inactive {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #64748b;
+}
+
+/* Estado Ativo: Geral Enabled */
+.btn-action-badge.active-enabled {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #34d399;
+}
+
+.btn-action-badge.active-enabled:hover {
+  background: rgba(16, 185, 129, 0.25);
+}
+
+.btn-action-badge.inactive-disabled {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+/* Botões de Mescla */
+.btn-action-badge.btn-edit-merged {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #d8b4fe;
+}
+
+.btn-action-badge.btn-delete-merged {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.catalog-order-buttons {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+}
+
+.btn-nav-arrow {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .merged-sources-checklist {

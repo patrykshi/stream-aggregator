@@ -587,16 +587,25 @@ async function syncCatalogsFromAddons() {
           (!c.isMerged && c.originalId === cat.id && (c.addonUrl === addon.url || c.addonName === addon.name))
         );
 
+        // Limpa o nome para não conter [Addon]
+        let cleanName = (cat.name || cat.id || 'Catálogo').replace(/^\[.*?\]\s*/, '').trim();
+
         if (existing) {
-          // Preserva customName e status
+          // Se o usuário não definiu customName próprio, limpa qualquer resquício de [Addon]
+          let existingCustom = existing.customName ? existing.customName.replace(/^\[.*?\]\s*/, '').trim() : '';
+
           newCustomCatalogs.push({
             ...existing,
             id: namespacedId,
             addonName: addon.name,
             addonUrl: addon.url,
             originalId: cat.id,
-            name: `[${addon.name}] ${cat.name || cat.id}`,
-            type: cat.type || 'movie'
+            name: cleanName,
+            customName: existingCustom,
+            type: cat.type || 'movie',
+            enabled: existing.enabled !== false,
+            showOnHome: existing.showOnHome !== false,
+            isFavorite: Boolean(existing.isFavorite)
           });
         } else {
           newCustomCatalogs.push({
@@ -604,10 +613,12 @@ async function syncCatalogsFromAddons() {
             addonName: addon.name,
             addonUrl: addon.url,
             originalId: cat.id,
-            name: `[${addon.name}] ${cat.name || cat.id}`,
+            name: cleanName,
             customName: '',
             type: cat.type || 'movie',
             enabled: true,
+            showOnHome: true,
+            isFavorite: false,
             isMerged: false,
             sourceCatalogIds: []
           });
@@ -631,6 +642,9 @@ async function syncCatalogsFromAddons() {
   }
 }
 
+// Drag & Drop State
+let draggedCatalogId = null;
+
 function renderCatalogStudio() {
   catalogItemsList.innerHTML = '';
   const list = state.customCatalogs || [];
@@ -646,12 +660,16 @@ function renderCatalogStudio() {
 
   list.forEach((cat, idx) => {
     const card = document.createElement('div');
-    card.className = `catalog-item-card ${!cat.enabled ? 'disabled' : ''} ${cat.isMerged ? 'is-merged' : ''}`;
+    card.className = `catalog-item-card ${!cat.enabled ? 'disabled' : ''} ${cat.isMerged ? 'is-merged' : ''} ${cat.isFavorite ? 'is-favorite' : ''}`;
+    card.setAttribute('draggable', 'true');
+    card.setAttribute('data-id', cat.id);
 
     const isFirst = idx === 0;
     const isLast = idx === list.length - 1;
 
-    const displayName = cat.customName ? cat.customName : cat.name;
+    const rawDisplayName = cat.customName ? cat.customName : cat.name;
+    // Garante remoção de colchetes residuais
+    const displayName = rawDisplayName.replace(/^\[.*?\]\s*/, '').trim();
     const typeLabel = cat.type === 'series' ? 'Série' : (cat.type === 'movie' ? 'Filme' : cat.type);
 
     let badgeHtml = '';
@@ -662,17 +680,22 @@ function renderCatalogStudio() {
       badgeHtml = `<span class="catalog-tag-merged">Mesclado</span>`;
       subInfoHtml = `<span>Mesclando ${srcCount} catálogo(s) com deduplicação inteligente</span>`;
     } else {
-      subInfoHtml = `<span>Addon: <strong>${escapeHtml(cat.addonName || 'Addon')}</strong></span>`;
+      subInfoHtml = `<span>Origem: <strong>${escapeHtml(cat.addonName || 'Addon')}</strong></span>`;
     }
 
+    const isHome = cat.showOnHome !== false;
+    const isFav = Boolean(cat.isFavorite);
+    const isEnabled = cat.enabled !== false;
+
     card.innerHTML = `
+      <div class="catalog-drag-handle" title="Arraste para reordenar">⠿</div>
       <div class="catalog-left-info">
         <span class="catalog-order-badge">${idx + 1}</span>
         <div class="catalog-title-wrapper">
           <input type="text" class="catalog-inline-name" value="${escapeHtml(displayName)}" 
-                 title="Clique para editar o título no Stremio" 
+                 title="Clique para editar o título exibido" 
                  onchange="window._changeCatalogName('${cat.id}', this.value)" 
-                 placeholder="Nome de exibição">
+                 placeholder="Nome do catálogo">
           <div class="catalog-meta-sub">
             ${badgeHtml}
             <span class="catalog-tag-type">${typeLabel}</span>
@@ -681,18 +704,108 @@ function renderCatalogStudio() {
         </div>
       </div>
       <div class="catalog-right-actions">
-        ${cat.isMerged ? `<button type="button" class="btn-icon" title="Editar fontes da mescla" onclick="window._editMergedCatalog('${cat.id}')">✏️</button>` : ''}
-        <button type="button" class="btn-icon" title="Subir na tela inicial" ${isFirst ? 'disabled style="opacity:0.25"' : ''} onclick="window._moveCatalog('${cat.id}', -1)">↑</button>
-        <button type="button" class="btn-icon" title="Descer na tela inicial" ${isLast ? 'disabled style="opacity:0.25"' : ''} onclick="window._moveCatalog('${cat.id}', 1)">↓</button>
-        <button type="button" class="btn-icon" title="${cat.enabled ? 'Desativar na home' : 'Ativar na home'}" onclick="window._toggleCatalog('${cat.id}')">
-          ${cat.enabled ? '✓' : '✗'}
+        <!-- Botão Favorito -->
+        <button type="button" class="btn-action-badge ${isFav ? 'active-fav' : ''}" 
+                title="${isFav ? 'Remover dos favoritos' : 'Marcar como favorito'}" 
+                onclick="window._toggleFavoriteCatalog('${cat.id}')">
+          <span class="btn-icon-symbol">⭐</span>
+          <span class="btn-label-text">${isFav ? 'Favorito' : 'Favoritar'}</span>
         </button>
-        ${cat.isMerged ? `<button type="button" class="btn-icon delete" title="Excluir catálogo mesclado" onclick="window._deleteCatalog('${cat.id}')">🗑</button>` : ''}
+
+        <!-- Botão Exibir na Página Principal (Home Stremio/Nuvio) -->
+        <button type="button" class="btn-action-badge ${isHome ? 'active-home' : 'inactive'}" 
+                title="${isHome ? 'Exibindo na Página Principal (Home). Clique para ocultar da Home' : 'Oculto da Home. Clique para exibir na Página Inicial'}" 
+                onclick="window._toggleHomeCatalog('${cat.id}')">
+          <span class="btn-icon-symbol">🏠</span>
+          <span class="btn-label-text">${isHome ? 'Na Home' : 'Fora da Home'}</span>
+        </button>
+
+        <!-- Botão Ativar/Desativar Geral -->
+        <button type="button" class="btn-action-badge ${isEnabled ? 'active-enabled' : 'inactive-disabled'}" 
+                title="${isEnabled ? 'Catálogo Ativo no Agregador. Clique para desativar' : 'Catálogo Desativado. Clique para ativar'}" 
+                onclick="window._toggleCatalog('${cat.id}')">
+          <span class="btn-icon-symbol">${isEnabled ? '👁️' : '🚫'}</span>
+          <span class="btn-label-text">${isEnabled ? 'Ativo' : 'Inativo'}</span>
+        </button>
+
+        <!-- Reordenação por botões ↑ / ↓ -->
+        <div class="catalog-order-buttons">
+          <button type="button" class="btn-icon btn-nav-arrow" title="Subir prioridade" ${isFirst ? 'disabled style="opacity:0.25"' : ''} onclick="window._moveCatalog('${cat.id}', -1)">↑</button>
+          <button type="button" class="btn-icon btn-nav-arrow" title="Descer prioridade" ${isLast ? 'disabled style="opacity:0.25"' : ''} onclick="window._moveCatalog('${cat.id}', 1)">↓</button>
+        </div>
+
+        ${cat.isMerged ? `<button type="button" class="btn-action-badge btn-edit-merged" title="Editar fontes da mescla" onclick="window._editMergedCatalog('${cat.id}')">✏️ Editar</button>` : ''}
+        ${cat.isMerged ? `<button type="button" class="btn-action-badge btn-delete-merged" title="Excluir catálogo mesclado" onclick="window._deleteCatalog('${cat.id}')">🗑</button>` : ''}
       </div>
     `;
 
+    // Eventos Drag and Drop
+    card.addEventListener('dragstart', (e) => {
+      draggedCatalogId = cat.id;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', cat.id);
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      draggedCatalogId = null;
+      document.querySelectorAll('.catalog-item-card').forEach(c => c.classList.remove('drag-over'));
+    });
+
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      card.classList.add('drag-over');
+    });
+
+    card.addEventListener('dragleave', () => {
+      card.classList.remove('drag-over');
+    });
+
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      const targetId = cat.id;
+      if (!draggedCatalogId || draggedCatalogId === targetId) return;
+
+      const fromIndex = state.customCatalogs.findIndex(c => c.id === draggedCatalogId);
+      const toIndex = state.customCatalogs.findIndex(c => c.id === targetId);
+
+      if (fromIndex >= 0 && toIndex >= 0) {
+        const [movedItem] = state.customCatalogs.splice(fromIndex, 1);
+        state.customCatalogs.splice(toIndex, 0, movedItem);
+        renderCatalogStudio();
+        updateManifestUrl();
+        saveToStorage();
+        showToast('Ordem dos catálogos atualizada!');
+      }
+    });
+
     catalogItemsList.appendChild(card);
   });
+}
+
+function toggleFavoriteCatalog(catId) {
+  const cat = state.customCatalogs.find(c => c.id === catId);
+  if (cat) {
+    cat.isFavorite = !cat.isFavorite;
+    renderCatalogStudio();
+    updateManifestUrl();
+    saveToStorage();
+    showToast(cat.isFavorite ? `⭐ "${cat.customName || cat.name}" marcado como favorito!` : `Removido dos favoritos`);
+  }
+}
+
+function toggleHomeCatalog(catId) {
+  const cat = state.customCatalogs.find(c => c.id === catId);
+  if (cat) {
+    cat.showOnHome = cat.showOnHome === false ? true : false;
+    renderCatalogStudio();
+    updateManifestUrl();
+    saveToStorage();
+    showToast(cat.showOnHome ? `🏠 "${cat.customName || cat.name}" visível na Home!` : `Oculto da Home`);
+  }
 }
 
 function changeCatalogName(catId, newName) {
@@ -854,6 +967,8 @@ function saveMergedCatalog() {
 window._changeCatalogName = changeCatalogName;
 window._moveCatalog = moveCatalog;
 window._toggleCatalog = toggleCatalog;
+window._toggleFavoriteCatalog = toggleFavoriteCatalog;
+window._toggleHomeCatalog = toggleHomeCatalog;
 window._deleteCatalog = deleteCatalog;
 window._editMergedCatalog = (id) => openMergedCatalogModal(id);
 

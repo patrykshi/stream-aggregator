@@ -97,6 +97,45 @@ describe('Catalogs Module', () => {
     assert.equal(manifest.catalogs[0].id, 'merged__merged_123');
     assert.equal(manifest.catalogs[0].name, '🔥 Filmes em Alta');
   });
+
+  it('deve respeitar showOnHome: false e priorizar isFavorite: true', () => {
+    const config = {
+      customCatalogs: [
+        {
+          id: 'cat_normal',
+          name: 'Normal',
+          type: 'movie',
+          enabled: true,
+          showOnHome: true,
+          isFavorite: false
+        },
+        {
+          id: 'cat_fav',
+          name: 'Favorito VIP',
+          type: 'movie',
+          enabled: true,
+          showOnHome: true,
+          isFavorite: true
+        },
+        {
+          id: 'cat_hidden_home',
+          name: 'Oculto da Home',
+          type: 'movie',
+          enabled: true,
+          showOnHome: false, // Oculto da tela inicial
+          isFavorite: false
+        }
+      ]
+    };
+
+    const manifest = generateManifest(config);
+    // cat_hidden_home não deve aparecer na home
+    assert.equal(manifest.catalogs.length, 2);
+    // cat_fav deve vir antes de cat_normal por ser favorito
+    assert.equal(manifest.catalogs[0].id, 'cat_fav');
+    assert.equal(manifest.catalogs[0].name, 'Favorito VIP');
+    assert.equal(manifest.catalogs[1].id, 'cat_normal');
+  });
 });
 
 

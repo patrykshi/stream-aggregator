@@ -90,6 +90,8 @@ export function sanitizeConfig(cfg) {
         customName: typeof c.customName === 'string' ? c.customName : '',
         type: String(c.type || 'movie'),
         enabled: c.enabled !== false,
+        showOnHome: c.showOnHome !== false,
+        isFavorite: Boolean(c.isFavorite),
         isMerged: Boolean(c.isMerged),
         sourceCatalogIds: Array.isArray(c.sourceCatalogIds) ? c.sourceCatalogIds : [],
         extra: Array.isArray(c.extra) ? c.extra : [{ name: 'skip', isRequired: false }]

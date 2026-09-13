@@ -16,10 +16,20 @@ export function generateManifest(config = {}) {
   let aggregatedCatalogs = [];
 
   if (Array.isArray(config.customCatalogs) && config.customCatalogs.length > 0) {
-    // Utiliza a ordenação e customizações definidas pelo usuário na tela de Catálogos
-    config.customCatalogs.forEach(cat => {
-      if (cat.enabled === false) return;
+    // Utiliza a ordenação e customizações definidas pelo usuário na tela de Catálogos.
+    // Catálogos desativados (enabled === false) ou ocultos da home (showOnHome === false)
+    // não são expostos na lista de catálogos do manifest (Home do Stremio/Nuvio).
+    const activeCustom = config.customCatalogs.filter(cat => cat.enabled !== false && cat.showOnHome !== false);
 
+    // Favoritos têm prioridade natural se marcados como favoritos
+    const sortedCustom = [...activeCustom].sort((a, b) => {
+      if (Boolean(b.isFavorite) !== Boolean(a.isFavorite)) {
+        return b.isFavorite ? 1 : -1;
+      }
+      return 0; // mantém a ordem definida na lista (arrastar e soltar / setas)
+    });
+
+    sortedCustom.forEach(cat => {
       const id = cat.isMerged ? `merged__${cat.id}` : cat.id;
       const displayName = cat.customName ? cat.customName.trim() : cat.name;
 
