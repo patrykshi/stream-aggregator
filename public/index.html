@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Stream Aggregator - Hub Unificado</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-area">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <h1>Stream Aggregator</h1>
+          <p class="subtitle">Agregador Universal de Manifests & Streams para Stremio</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge badge-pulse">Stremio & Nuvio Ready</span>
+      </div>
+    </header>
+
+    <main class="content-grid">
+      <!-- Coluna Esquerda: Addons & Provedores -->
+      <section class="card">
+        <div class="card-header">
+          <h2>1. Provedores de Streaming</h2>
+          <span class="badge-count" id="addonCountBadge">0 configurados</span>
+        </div>
+        <p class="card-desc">Adicione manifests de addons. O agregador consultará todos em paralelo respeitando a ordem de prioridade.</p>
+
+        <!-- Presets rápidos -->
+        <div class="presets-section">
+          <label class="section-label">Presets Rápidos:</label>
+          <div class="preset-buttons">
+            <button type="button" class="btn-preset" data-name="Torrentio" data-url="https://torrentio.strem.fun/manifest.json">+ Torrentio</button>
+            <button type="button" class="btn-preset" data-name="MediaFusion" data-url="https://mediafusion.elfhosted.com/manifest.json">+ MediaFusion</button>
+            <button type="button" class="btn-preset" data-name="Comet" data-url="https://comet.elfhosted.com/manifest.json">+ Comet</button>
+            <button type="button" class="btn-preset" data-name="KnightCrawler" data-url="https://knightcrawler.elfhosted.com/manifest.json">+ KnightCrawler</button>
+            <button type="button" class="btn-preset" data-name="Emby Bridge" data-url="http://localhost:7000/manifest.json">+ Emby Local</button>
+          </div>
+        </div>
+
+        <!-- Adicionar Addon Manual -->
+        <div class="add-addon-form">
+          <div class="input-group">
+            <input type="text" id="addonUrlInput" placeholder="Cole a URL do manifest (ex: https://.../manifest.json)" autocomplete="off">
+            <input type="text" id="addonNameInput" placeholder="Nome (opcional)" class="input-name-short" autocomplete="off">
+            <button type="button" id="btnAddAddon" class="btn btn-primary">
+              <span id="btnAddText">Testar & Adicionar</span>
+            </button>
+          </div>
+          <div id="addAddonFeedback" class="feedback-msg"></div>
+        </div>
+
+        <!-- Lista de Addons Ativos -->
+        <div class="addon-list" id="addonList">
+          <div class="empty-state" id="emptyState">
+            Nenhum provedor adicionado ainda. Escolha um preset acima ou cole uma URL de manifest.
+          </div>
+        </div>
+      </section>
+
+      <!-- Coluna Direita: Filtros, Ordenação & Instalação -->
+      <div class="right-column">
+        <!-- Card de Filtros -->
+        <section class="card">
+          <div class="card-header">
+            <h2>2. Regras e Filtros</h2>
+          </div>
+
+          <div class="filter-group">
+            <label class="section-label">Resoluções Permitidas:</label>
+            <div class="checkbox-group">
+              <label class="checkbox-label"><input type="checkbox" id="res4k" checked> <span>4K / UHD</span></label>
+              <label class="checkbox-label"><input type="checkbox" id="res1080p" checked> <span>1080p (FHD)</span></label>
+              <label class="checkbox-label"><input type="checkbox" id="res720p" checked> <span>720p (HD)</span></label>
+              <label class="checkbox-label"><input type="checkbox" id="res480p" checked> <span>480p / SD</span></label>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="section-label">Qualidade & Limpeza:</label>
+            <div class="toggle-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="filterRemoveCams" checked>
+                <span class="toggle-slider"></span>
+                <span>Ocultar gravações de cinema (CAM, TeleSync, Screener)</span>
+              </label>
+              <label class="toggle-label">
+                <input type="checkbox" id="filterDeduplicate" checked>
+                <span class="toggle-slider"></span>
+                <span>Desduplicar releases idênticos (mesmo torrent/hash)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="section-label" for="filterRegex">Excluir por Termos ou Regex:</label>
+            <input type="text" id="filterRegex" class="input-text" placeholder="Ex: \b(ita|hindi|telesync)\b">
+            <small class="help-text">Streams contendo esses termos no título ou descrição serão ignorados.</small>
+          </div>
+
+          <div class="filter-row">
+            <div class="filter-col">
+              <label class="section-label" for="maxStreamsPerAddon">Máx streams por addon:</label>
+              <input type="number" id="maxStreamsPerAddon" class="input-number" min="1" max="50" value="10">
+            </div>
+            <div class="filter-col">
+              <label class="section-label" for="maxTotalStreams">Máx total de streams:</label>
+              <input type="number" id="maxTotalStreams" class="input-number" min="1" max="100" value="30">
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="section-label" for="badgeFormat">Identificação do Provedor:</label>
+            <select id="badgeFormat" class="select-input">
+              <option value="addon">Destacar com [Nome do Addon]</option>
+              <option value="clean">Título limpo (original do scraper)</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- Card de Instalação e Links -->
+        <section class="card highlight-card">
+          <div class="card-header">
+            <h2>3. Instalar no Stremio</h2>
+          </div>
+          <p class="card-desc">Sua URL de manifest única é gerada automaticamente com todas as suas preferências.</p>
+
+          <div class="install-actions">
+            <a id="btnInstallStremio" href="#" class="btn btn-stremio btn-large">
+              🎬 Instalar no Stremio
+            </a>
+            <button type="button" id="btnCopyUrl" class="btn btn-secondary btn-large">
+              📋 Copiar Manifest
+            </button>
+          </div>
+
+          <div class="manifest-preview">
+            <label class="section-label">URL do seu Manifest:</label>
+            <div class="url-box">
+              <input type="text" id="manifestUrlDisplay" readonly value="">
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Stream Aggregator • Compatível com Stremio v2 API, Nuvio e HTTP Players</p>
+    </footer>
+  </div>
+
+  <!-- Modal de Configurações do Addon (Engrenagem ⚙️) -->
+  <div id="addonSettingsModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Configurações do Addon</h3>
+        <button type="button" class="btn-close-modal" id="btnCloseModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modalAddonId">
+
+        <div class="modal-form-group">
+          <label class="section-label" for="modalAddonName">Nome de Exibição:</label>
+          <input type="text" id="modalAddonName" class="input-text">
+        </div>
+
+        <div class="modal-form-group">
+          <label class="section-label" for="modalAddonUrl">URL do Manifest:</label>
+          <div class="url-edit-wrapper">
+            <textarea id="modalAddonUrl" class="input-textarea" rows="2"></textarea>
+            <button type="button" id="btnModalCopyUrl" class="btn btn-secondary btn-sm" title="Copiar URL">📋 Copiar</button>
+          </div>
+        </div>
+
+        <div class="modal-form-group">
+          <label class="section-label" for="modalAddonTimeout">Timeout de Resposta (ms):</label>
+          <input type="number" id="modalAddonTimeout" class="input-number" min="1000" max="30000" step="500" value="7000">
+          <small class="help-text">Tempo máximo que o agregador esperará este addon responder antes de ignorar (padrão: 7000ms).</small>
+        </div>
+
+        <div id="modalTestFeedback" class="feedback-msg"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btnModalTestAddon" class="btn btn-secondary">
+          🔍 Testar Conexão
+        </button>
+        <button type="button" id="btnModalSaveAddon" class="btn btn-primary">
+          💾 Salvar Alterações
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

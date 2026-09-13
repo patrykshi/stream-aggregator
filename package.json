@@ -1,0 +1,27 @@
+{
+  "name": "stream-aggregator",
+  "version": "1.0.0",
+  "description": "Agregador universal de manifests e streams para Stremio e outros players",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1"
+  },
+  "keywords": [
+    "stremio",
+    "addon",
+    "aggregator",
+    "streams",
+    "nuvio"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
