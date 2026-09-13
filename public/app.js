@@ -39,6 +39,8 @@ const collectionsCategoryList = document.getElementById('collectionsCategoryList
 const collectionsJsonEditor = document.getElementById('collectionsJsonEditor');
 const btnApplyJsonCollections = document.getElementById('btnApplyJsonCollections');
 const jsonEditorFeedback = document.getElementById('jsonEditorFeedback');
+const collectionsUrlDisplay = document.getElementById('collectionsUrlDisplay');
+const btnCopyCollectionsUrl = document.getElementById('btnCopyCollectionsUrl');
 
 // Elementos DOM - Provedores
 const addonUrlInput = document.getElementById('addonUrlInput');
@@ -1039,6 +1041,22 @@ function setupCollectionsStudioListeners() {
     btnApplyJsonCollections.addEventListener('click', applyJsonCollections);
   }
 
+  if (btnCopyCollectionsUrl) {
+    btnCopyCollectionsUrl.addEventListener('click', () => {
+      const url = collectionsUrlDisplay ? collectionsUrlDisplay.value : '';
+      if (!url) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          showToast('URL de collections.json copiada!');
+        }).catch(() => {
+          showToast('Erro ao copiar URL.');
+        });
+      } else {
+        showToast('Área de transferência indisponível.');
+      }
+    });
+  }
+
   // Listeners dos Modais
   if (btnCloseFolderModal) btnCloseFolderModal.addEventListener('click', closeFolderModal);
   if (btnCancelFolderModal) btnCancelFolderModal.addEventListener('click', closeFolderModal);
@@ -1529,10 +1547,14 @@ async function updateManifestUrl() {
 
     const origin = window.location.origin;
     const manifestHttpsUrl = `${origin}/${token}/manifest.json`;
+    const collectionsHttpsUrl = `${origin}/${token}/collections.json`;
     const hostWithPort = window.location.host;
     const stremioProtocolUrl = `stremio://${hostWithPort}/${token}/manifest.json`;
 
     manifestUrlDisplay.value = manifestHttpsUrl;
+    if (collectionsUrlDisplay) {
+      collectionsUrlDisplay.value = collectionsHttpsUrl;
+    }
     btnInstallStremio.href = stremioProtocolUrl;
   } catch (err) {
     console.error('Falha ao gerar URL de manifest:', err);

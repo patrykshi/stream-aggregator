@@ -194,6 +194,13 @@ app.get('/:config/collections.json', (req, res) => {
   res.json(config.nuvioCollections || []);
 });
 
+// Fallback sem token para Nuvio Collections
+app.get('/collections.json', (req, res) => {
+  const def = getDefaultConfig();
+  res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+  res.json(def.nuvioCollections || []);
+});
+
 // Página de configuração
 app.get('/configure', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
