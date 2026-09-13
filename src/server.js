@@ -44,7 +44,7 @@ app.post('/api/validate-addon', async (req, res) => {
   console.log(`[Validate Addon] Testando manifest: ${manifestUrl}`);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos
+  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 segundos para scrapers lentos
 
   try {
     const response = await fetch(manifestUrl, {

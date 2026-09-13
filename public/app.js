@@ -210,7 +210,13 @@ function setupModalListeners() {
         if (addon) {
           addon.status = 'online';
           if (Array.isArray(data.resources)) addon.availableResources = data.resources;
-          if (Array.isArray(data.catalogs)) addon.catalogs = data.catalogs;
+          if (Array.isArray(data.catalogs)) {
+            addon.catalogs = data.catalogs;
+            if (data.catalogs.length > 0) {
+              modalResCatalogs.checked = true;
+              addon.includeCatalogs = true;
+            }
+          }
         }
       } else {
         modalTestFeedback.textContent = `Falha: ${data.error}`;
@@ -523,55 +529,106 @@ function setupCatalogStudioListeners() {
 /**
  * Sincroniza os catálogos encontrados em todos os addons para o array `state.customCatalogs`.
  * Mantém eventuais catálogos mesclados e customizações já existentes.
+ * Caso algum addon não tenha catálogos carregados em memória (ou adicionado anteriormente),
+ * busca o manifest atualizado via /api/validate-addon em tempo real.
  */
-function syncCatalogsFromAddons() {
-  const existingMerged = state.customCatalogs.filter(c => c.isMerged);
-  const newCustomCatalogs = [...existingMerged];
+async function syncCatalogsFromAddons() {
+  const originalText = btnSyncCatalogs ? btnSyncCatalogs.innerHTML : '';
+  if (btnSyncCatalogs) {
+    btnSyncCatalogs.disabled = true;
+    btnSyncCatalogs.innerHTML = '🔄 Consultando Addons...';
+  }
 
-  let addedCount = 0;
-  state.addons.forEach((addon, addonIdx) => {
-    if (addon.enabled === false || addon.includeCatalogs === false) return;
-    if (!Array.isArray(addon.catalogs) || addon.catalogs.length === 0) return;
-
-    addon.catalogs.forEach(cat => {
-      const namespacedId = `a${addonIdx}__${cat.id}`;
-      // Verifica se já existe
-      const existing = state.customCatalogs.find(c => c.id === namespacedId || (!c.isMerged && c.originalId === cat.id && c.addonUrl === addon.url));
-
-      if (existing) {
-        // Preserva ID e nome customizado
-        newCustomCatalogs.push({
-          ...existing,
-          id: namespacedId,
-          addonName: addon.name,
-          addonUrl: addon.url,
-          originalId: cat.id,
-          name: `[${addon.name}] ${cat.name || cat.id}`,
-          type: cat.type || 'movie'
+  try {
+    // 1. Atualiza manifests de todos os addons ativos em paralelo
+    const updatePromises = state.addons.map(async (addon) => {
+      if (addon.enabled === false) return;
+      try {
+        const res = await fetch('/api/validate-addon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: addon.url })
         });
-      } else {
-        newCustomCatalogs.push({
-          id: namespacedId,
-          addonName: addon.name,
-          addonUrl: addon.url,
-          originalId: cat.id,
-          name: `[${addon.name}] ${cat.name || cat.id}`,
-          customName: '',
-          type: cat.type || 'movie',
-          enabled: true,
-          isMerged: false,
-          sourceCatalogIds: []
-        });
-        addedCount++;
+        const data = await res.json();
+        if (data.valid) {
+          addon.status = 'online';
+          if (Array.isArray(data.catalogs)) {
+            addon.catalogs = data.catalogs;
+          }
+          if (Array.isArray(data.resources)) {
+            addon.availableResources = data.resources;
+            // Garante que se o addon oferece catálogo, includeCatalogs esteja ativo por padrão
+            if (data.catalogs && data.catalogs.length > 0 && addon.includeCatalogs === undefined) {
+              addon.includeCatalogs = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[Sync] Falha ao atualizar catálogo de ${addon.name}:`, err.message);
       }
     });
-  });
 
-  state.customCatalogs = newCustomCatalogs;
-  renderCatalogStudio();
-  updateManifestUrl();
-  saveToStorage();
-  showToast(`Catálogos sincronizados! Total: ${state.customCatalogs.length}`);
+    await Promise.allSettled(updatePromises);
+
+    // 2. Compila a lista de catálogos sincronizados
+    const existingMerged = state.customCatalogs.filter(c => c.isMerged);
+    const newCustomCatalogs = [...existingMerged];
+
+    let addedCount = 0;
+    state.addons.forEach((addon, addonIdx) => {
+      if (addon.enabled === false || addon.includeCatalogs === false) return;
+      if (!Array.isArray(addon.catalogs) || addon.catalogs.length === 0) return;
+
+      addon.catalogs.forEach(cat => {
+        const namespacedId = `a${addonIdx}__${cat.id}`;
+        // Verifica se já existe por ID namespaced ou por ID original + addonUrl
+        const existing = state.customCatalogs.find(c =>
+          c.id === namespacedId ||
+          (!c.isMerged && c.originalId === cat.id && (c.addonUrl === addon.url || c.addonName === addon.name))
+        );
+
+        if (existing) {
+          // Preserva customName e status
+          newCustomCatalogs.push({
+            ...existing,
+            id: namespacedId,
+            addonName: addon.name,
+            addonUrl: addon.url,
+            originalId: cat.id,
+            name: `[${addon.name}] ${cat.name || cat.id}`,
+            type: cat.type || 'movie'
+          });
+        } else {
+          newCustomCatalogs.push({
+            id: namespacedId,
+            addonName: addon.name,
+            addonUrl: addon.url,
+            originalId: cat.id,
+            name: `[${addon.name}] ${cat.name || cat.id}`,
+            customName: '',
+            type: cat.type || 'movie',
+            enabled: true,
+            isMerged: false,
+            sourceCatalogIds: []
+          });
+          addedCount++;
+        }
+      });
+    });
+
+    state.customCatalogs = newCustomCatalogs;
+    render();
+    saveToStorage();
+    showToast(`Sincronização concluída! ${state.customCatalogs.length} catálogo(s) prontos.`);
+  } catch (err) {
+    showToast('Erro ao sincronizar catálogos.');
+    console.error(err);
+  } finally {
+    if (btnSyncCatalogs) {
+      btnSyncCatalogs.disabled = false;
+      btnSyncCatalogs.innerHTML = originalText;
+    }
+  }
 }
 
 function renderCatalogStudio() {
