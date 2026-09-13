@@ -98,7 +98,7 @@ describe('Catalogs Module', () => {
     assert.equal(manifest.catalogs[0].name, '🔥 Filmes em Alta');
   });
 
-  it('deve respeitar showOnHome: false e priorizar isFavorite: true', () => {
+  it('deve incluir showInHome para compatibilidade com Coleções do Nuvio e priorizar isFavorite: true', () => {
     const config = {
       customCatalogs: [
         {
@@ -119,22 +119,33 @@ describe('Catalogs Module', () => {
         },
         {
           id: 'cat_hidden_home',
-          name: 'Oculto da Home',
+          name: 'Oculto da Home (Apenas Coleção Nuvio)',
           type: 'movie',
           enabled: true,
-          showOnHome: false, // Oculto da tela inicial
+          showOnHome: false, // Oculto da tela inicial, mas presente na central de Coleções do Nuvio
           isFavorite: false
+        },
+        {
+          id: 'cat_disabled',
+          name: 'Desativado Geral',
+          type: 'movie',
+          enabled: false,
+          showOnHome: false
         }
       ]
     };
 
     const manifest = generateManifest(config);
-    // cat_hidden_home não deve aparecer na home
-    assert.equal(manifest.catalogs.length, 2);
+    // cat_disabled não deve constar, mas os 3 ativos devem
+    assert.equal(manifest.catalogs.length, 3);
     // cat_fav deve vir antes de cat_normal por ser favorito
     assert.equal(manifest.catalogs[0].id, 'cat_fav');
-    assert.equal(manifest.catalogs[0].name, 'Favorito VIP');
+    assert.equal(manifest.catalogs[0].showInHome, true);
     assert.equal(manifest.catalogs[1].id, 'cat_normal');
+    assert.equal(manifest.catalogs[1].showInHome, true);
+    // cat_hidden_home deve ter showInHome: false para o Nuvio exibir apenas em Coleções
+    assert.equal(manifest.catalogs[2].id, 'cat_hidden_home');
+    assert.equal(manifest.catalogs[2].showInHome, false);
   });
 });
 

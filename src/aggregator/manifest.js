@@ -17,11 +17,12 @@ export function generateManifest(config = {}) {
 
   if (Array.isArray(config.customCatalogs) && config.customCatalogs.length > 0) {
     // Utiliza a ordenação e customizações definidas pelo usuário na tela de Catálogos.
-    // Catálogos desativados (enabled === false) ou ocultos da home (showOnHome === false)
-    // não são expostos na lista de catálogos do manifest (Home do Stremio/Nuvio).
-    const activeCustom = config.customCatalogs.filter(cat => cat.enabled !== false && cat.showOnHome !== false);
+    // Catálogos com enabled === false são completamente desativados.
+    // Catálogos com showOnHome === false permanecem disponíveis para a interface de Coleções / Discover do Nuvio e Stremio,
+    // identificados pela propriedade padrão do ecossistema Nuvio: `showInHome: false`.
+    const activeCustom = config.customCatalogs.filter(cat => cat.enabled !== false);
 
-    // Favoritos têm prioridade natural se marcados como favoritos
+    // Favoritos têm prioridade natural no topo da lista
     const sortedCustom = [...activeCustom].sort((a, b) => {
       if (Boolean(b.isFavorite) !== Boolean(a.isFavorite)) {
         return b.isFavorite ? 1 : -1;
@@ -32,11 +33,13 @@ export function generateManifest(config = {}) {
     sortedCustom.forEach(cat => {
       const id = cat.isMerged ? `merged__${cat.id}` : cat.id;
       const displayName = cat.customName ? cat.customName.trim() : cat.name;
+      const showInHome = cat.showOnHome !== false;
 
       aggregatedCatalogs.push({
         type: cat.type || 'movie',
         id,
         name: displayName,
+        showInHome,
         extra: cat.extra || [{ name: 'skip', isRequired: false }]
       });
     });
