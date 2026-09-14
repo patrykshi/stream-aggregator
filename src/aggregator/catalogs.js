@@ -2,22 +2,26 @@ import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './url-helper.js';
 
 /**
  * Cria o ID com namespace para um catálogo de um addon específico.
+ * Se o tipo for fornecido, inclui no namespace para evitar colisão entre catálogos de tipos diferentes com mesmo ID.
  */
-export function buildCatalogId(addonIndex, originalId) {
-  return `a${addonIndex}__${originalId}`;
+export function buildCatalogId(addonIndex, originalId, type = '') {
+  return type ? `a${addonIndex}_${type}__${originalId}` : `a${addonIndex}__${originalId}`;
 }
 
 /**
- * Faz o parse de um ID de catálogo com namespace para identificar o addon e o ID original.
+ * Faz o parse de um ID de catálogo com namespace para identificar o addon, ID original e tipo (se presente).
  */
 export function parseCatalogId(namespacedId) {
   const parts = String(namespacedId).split('__');
   if (parts.length >= 2 && parts[0].startsWith('a')) {
-    const addonIndex = parseInt(parts[0].slice(1), 10);
+    const prefix = parts[0].slice(1);
+    const subParts = prefix.split('_');
+    const addonIndex = parseInt(subParts[0], 10);
+    const catalogType = subParts.length > 1 ? subParts[1] : null;
     const originalId = parts.slice(1).join('__');
-    return { addonIndex, originalId };
+    return { addonIndex, originalId, catalogType };
   }
-  return { addonIndex: -1, originalId: namespacedId };
+  return { addonIndex: -1, originalId: namespacedId, catalogType: null };
 }
 
 /**

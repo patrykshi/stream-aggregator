@@ -50,3 +50,4 @@ describe('Profiles Module', () => {
     assert.equal(getProfile('quarto'), null);
   });
 });
+

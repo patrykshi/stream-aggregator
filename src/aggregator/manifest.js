@@ -50,7 +50,7 @@ export function generateManifest(config = {}) {
         addon.catalogs.forEach(cat => {
           aggregatedCatalogs.push({
             type: cat.type || 'movie',
-            id: buildCatalogId(idx, cat.id),
+            id: buildCatalogId(idx, cat.id, cat.type),
             name: `[${addon.name}] ${cat.name || cat.id}`,
             extra: cat.extra || [{ name: 'skip', isRequired: false }]
           });

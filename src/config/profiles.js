@@ -196,3 +196,4 @@ export function deleteProfile(profileId) {
   const success = saveProfilesMap(map);
   return { success };
 }
+

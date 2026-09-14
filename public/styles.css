@@ -944,6 +944,97 @@ body {
   flex-shrink: 0;
 }
 
+/* Barra de Ações em Massa de Catálogos */
+.catalog-bulk-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+
+.bulk-toolbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bulk-toolbar-title {
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.bulk-toolbar-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.bulk-toolbar-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-bulk {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-bulk:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-bulk-enable:hover {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+
+.btn-bulk-disable:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.btn-bulk-home:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+}
+
+.btn-bulk-hide-home:hover {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+}
+
+.bulk-divider {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--card-border);
+  margin: 0 4px;
+}
+
 .catalog-list-container {
   display: flex;
   flex-direction: column;

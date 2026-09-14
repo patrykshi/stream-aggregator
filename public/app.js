@@ -57,6 +57,10 @@ const btnSyncCatalogs = document.getElementById('btnSyncCatalogs');
 const btnNewMergedCatalog = document.getElementById('btnNewMergedCatalog');
 const catalogItemsList = document.getElementById('catalogItemsList');
 const catalogEmptyState = document.getElementById('catalogEmptyState');
+const btnEnableAllCatalogs = document.getElementById('btnEnableAllCatalogs');
+const btnDisableAllCatalogs = document.getElementById('btnDisableAllCatalogs');
+const btnHomeAllCatalogs = document.getElementById('btnHomeAllCatalogs');
+const btnHideHomeAllCatalogs = document.getElementById('btnHideHomeAllCatalogs');
 
 // Elementos DOM - Modal Catálogo Mesclado
 const mergedCatalogModal = document.getElementById('mergedCatalogModal');
@@ -546,6 +550,11 @@ function setupCatalogStudioListeners() {
   btnSyncCatalogs.addEventListener('click', syncCatalogsFromAddons);
   btnNewMergedCatalog.addEventListener('click', () => openMergedCatalogModal());
 
+  if (btnEnableAllCatalogs) btnEnableAllCatalogs.addEventListener('click', () => setAllCatalogsEnabled(true));
+  if (btnDisableAllCatalogs) btnDisableAllCatalogs.addEventListener('click', () => setAllCatalogsEnabled(false));
+  if (btnHomeAllCatalogs) btnHomeAllCatalogs.addEventListener('click', () => setAllCatalogsHome(true));
+  if (btnHideHomeAllCatalogs) btnHideHomeAllCatalogs.addEventListener('click', () => setAllCatalogsHome(false));
+
   btnCloseMergedModal.addEventListener('click', closeMergedModal);
   btnCancelMergedModal.addEventListener('click', closeMergedModal);
   mergedCatalogModal.addEventListener('click', (e) => {
@@ -553,6 +562,39 @@ function setupCatalogStudioListeners() {
   });
 
   btnSaveMergedModal.addEventListener('click', saveMergedCatalog);
+}
+
+/**
+ * Higieniza a lista de catálogos garantindo que cada um possua um ID estritamente único,
+ * prevenindo colisões entre catálogos de filmes e séries de um mesmo addon.
+ */
+function sanitizeCustomCatalogs(catalogs) {
+  if (!Array.isArray(catalogs)) return [];
+  const seenIds = new Set();
+  return catalogs.map((cat, idx) => {
+    let id = cat.id;
+    if (cat.isMerged) {
+      if (!id) id = `merged_${idx}_${Date.now()}`;
+      return { ...cat, id };
+    }
+    const type = cat.type || 'movie';
+    if (!id || seenIds.has(id)) {
+      const origId = cat.originalId || cat.id || `cat_${idx}`;
+      let addonIdx = '0';
+      if (typeof cat.id === 'string' && cat.id.startsWith('a')) {
+        const prefix = cat.id.split('__')[0].slice(1);
+        addonIdx = prefix.split('_')[0] || '0';
+      }
+      id = `a${addonIdx}_${type}__${origId}`;
+    }
+    let finalId = id;
+    let counter = 1;
+    while (seenIds.has(finalId)) {
+      finalId = `${id}_${counter++}`;
+    }
+    seenIds.add(finalId);
+    return { ...cat, id: finalId };
+  });
 }
 
 /**
@@ -609,11 +651,13 @@ async function syncCatalogsFromAddons() {
       if (!Array.isArray(addon.catalogs) || addon.catalogs.length === 0) return;
 
       addon.catalogs.forEach(cat => {
-        const namespacedId = `a${addonIdx}__${cat.id}`;
-        // Verifica se já existe por ID namespaced ou por ID original + addonUrl
+        const catType = cat.type || 'movie';
+        const namespacedId = `a${addonIdx}_${catType}__${cat.id}`;
+        // Verifica se já existe por ID namespaced novo ou antigo, ou por ID original + tipo + addonUrl
         const existing = state.customCatalogs.find(c =>
           c.id === namespacedId ||
-          (!c.isMerged && c.originalId === cat.id && (c.addonUrl === addon.url || c.addonName === addon.name))
+          (c.id === `a${addonIdx}__${cat.id}` && (c.type === catType || !c.type)) ||
+          (!c.isMerged && c.originalId === cat.id && (c.type === catType || !c.type) && (c.addonUrl === addon.url || c.addonName === addon.name))
         );
 
         // Limpa o nome para não conter [Addon]
@@ -631,7 +675,7 @@ async function syncCatalogsFromAddons() {
             originalId: cat.id,
             name: cleanName,
             customName: existingCustom,
-            type: cat.type || 'movie',
+            type: catType,
             enabled: existing.enabled !== false,
             showOnHome: existing.showOnHome !== false,
             isFavorite: Boolean(existing.isFavorite)
@@ -644,7 +688,7 @@ async function syncCatalogsFromAddons() {
             originalId: cat.id,
             name: cleanName,
             customName: '',
-            type: cat.type || 'movie',
+            type: catType,
             enabled: true,
             showOnHome: true,
             isFavorite: false,
@@ -656,9 +700,10 @@ async function syncCatalogsFromAddons() {
       });
     });
 
-    state.customCatalogs = newCustomCatalogs;
+    state.customCatalogs = sanitizeCustomCatalogs(newCustomCatalogs);
     render();
     saveToStorage();
+    setProfileSyncStatus(false, '● Alterações não salvas');
     showToast(`Sincronização concluída! ${state.customCatalogs.length} catálogo(s) prontos.`);
   } catch (err) {
     showToast('Erro ao sincronizar catálogos.');
@@ -822,6 +867,7 @@ function toggleFavoriteCatalog(catId) {
     renderCatalogStudio();
     updateManifestUrl();
     saveToStorage();
+    setProfileSyncStatus(false, '● Alterações não salvas');
     showToast(cat.isFavorite ? `⭐ "${cat.customName || cat.name}" marcado como favorito!` : `Removido dos favoritos`);
   }
 }
@@ -833,7 +879,8 @@ function toggleHomeCatalog(catId) {
     renderCatalogStudio();
     updateManifestUrl();
     saveToStorage();
-    showToast(cat.showOnHome ? `🏠 "${cat.customName || cat.name}" visível na Home!` : `Oculto da Home`);
+    setProfileSyncStatus(false, '● Alterações não salvas');
+    showToast(cat.showOnHome ? `🏠 "${cat.customName || cat.name}" visível na Home!` : `📦 "${cat.customName || cat.name}" oculto da Home`);
   }
 }
 
@@ -843,6 +890,7 @@ function changeCatalogName(catId, newName) {
     cat.customName = newName.trim();
     updateManifestUrl();
     saveToStorage();
+    setProfileSyncStatus(false, '● Alterações não salvas');
     showToast(`Título atualizado para "${cat.customName || cat.name}"!`);
   }
 }
@@ -860,6 +908,7 @@ function moveCatalog(catId, direction) {
   renderCatalogStudio();
   updateManifestUrl();
   saveToStorage();
+  setProfileSyncStatus(false, '● Alterações não salvas');
 }
 
 function toggleCatalog(catId) {
@@ -869,7 +918,39 @@ function toggleCatalog(catId) {
     renderCatalogStudio();
     updateManifestUrl();
     saveToStorage();
+    setProfileSyncStatus(false, '● Alterações não salvas');
+    showToast(cat.enabled ? `👁️ "${cat.customName || cat.name}" ativado!` : `🚫 "${cat.customName || cat.name}" desativado!`);
   }
+}
+
+function setAllCatalogsEnabled(enableState) {
+  if (!Array.isArray(state.customCatalogs) || state.customCatalogs.length === 0) {
+    showToast('Nenhum catálogo disponível para alterar.');
+    return;
+  }
+  state.customCatalogs.forEach(c => {
+    c.enabled = enableState;
+  });
+  renderCatalogStudio();
+  updateManifestUrl();
+  saveToStorage();
+  setProfileSyncStatus(false, '● Alterações não salvas');
+  showToast(enableState ? '👁️ Todos os catálogos foram ativados!' : '🚫 Todos os catálogos foram desativados!');
+}
+
+function setAllCatalogsHome(homeState) {
+  if (!Array.isArray(state.customCatalogs) || state.customCatalogs.length === 0) {
+    showToast('Nenhum catálogo disponível para alterar.');
+    return;
+  }
+  state.customCatalogs.forEach(c => {
+    c.showOnHome = homeState;
+  });
+  renderCatalogStudio();
+  updateManifestUrl();
+  saveToStorage();
+  setProfileSyncStatus(false, '● Alterações não salvas');
+  showToast(homeState ? '🏠 Todos os catálogos serão exibidos na Home!' : '📦 Todos os catálogos foram ocultados da Home (mantidos em Coleções)!');
 }
 
 function deleteCatalog(catId) {
@@ -1000,6 +1081,8 @@ window._toggleFavoriteCatalog = toggleFavoriteCatalog;
 window._toggleHomeCatalog = toggleHomeCatalog;
 window._deleteCatalog = deleteCatalog;
 window._editMergedCatalog = (id) => openMergedCatalogModal(id);
+window._setAllCatalogsEnabled = setAllCatalogsEnabled;
+window._setAllCatalogsHome = setAllCatalogsHome;
 
 // Modais de Coleção Nuvio DOM
 const nuvioFolderModal = document.getElementById('nuvioFolderModal');
@@ -1815,7 +1898,7 @@ function applyConfigToState(config) {
     }));
   }
   if (Array.isArray(config.customCatalogs)) {
-    state.customCatalogs = config.customCatalogs;
+    state.customCatalogs = sanitizeCustomCatalogs(config.customCatalogs);
   }
   if (Array.isArray(config.nuvioCollections)) {
     state.nuvioCollections = config.nuvioCollections;

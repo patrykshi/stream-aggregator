@@ -4,13 +4,32 @@ import { buildCatalogId, parseCatalogId, mergeAndDeduplicateMetas } from '../src
 import { generateManifest } from '../src/aggregator/manifest.js';
 
 describe('Catalogs Module', () => {
-  it('deve gerar e fazer parse do catalogId com namespace', () => {
-    const namespaced = buildCatalogId(2, 'top_movies');
-    assert.equal(namespaced, 'a2__top_movies');
+  it('deve gerar e fazer parse do catalogId com namespace (com e sem type)', () => {
+    // Sem type (retrocompatível)
+    const namespacedOld = buildCatalogId(2, 'top_movies');
+    assert.equal(namespacedOld, 'a2__top_movies');
 
-    const parsed = parseCatalogId(namespaced);
-    assert.equal(parsed.addonIndex, 2);
-    assert.equal(parsed.originalId, 'top_movies');
+    const parsedOld = parseCatalogId(namespacedOld);
+    assert.equal(parsedOld.addonIndex, 2);
+    assert.equal(parsedOld.originalId, 'top_movies');
+    assert.equal(parsedOld.catalogType, null);
+
+    // Com type (evita colisão movie x series)
+    const namespacedMovie = buildCatalogId(1, 'populares_fenix', 'movie');
+    const namespacedSeries = buildCatalogId(1, 'populares_fenix', 'series');
+    assert.equal(namespacedMovie, 'a1_movie__populares_fenix');
+    assert.equal(namespacedSeries, 'a1_series__populares_fenix');
+    assert.notEqual(namespacedMovie, namespacedSeries);
+
+    const parsedMovie = parseCatalogId(namespacedMovie);
+    assert.equal(parsedMovie.addonIndex, 1);
+    assert.equal(parsedMovie.originalId, 'populares_fenix');
+    assert.equal(parsedMovie.catalogType, 'movie');
+
+    const parsedSeries = parseCatalogId(namespacedSeries);
+    assert.equal(parsedSeries.addonIndex, 1);
+    assert.equal(parsedSeries.originalId, 'populares_fenix');
+    assert.equal(parsedSeries.catalogType, 'series');
   });
 
   it('deve intercalar e desduplicar listas de itens (round-robin + deduplicação por IMDb/ID)', () => {
@@ -64,7 +83,7 @@ describe('Catalogs Module', () => {
     assert.ok(resourceNames.includes('meta'));
 
     assert.equal(manifest.catalogs.length, 1);
-    assert.equal(manifest.catalogs[0].id, 'a2__cyberflix_popular');
+    assert.equal(manifest.catalogs[0].id, 'a2_movie__cyberflix_popular');
     assert.match(manifest.catalogs[0].name, /CyberFlix/);
   });
 
@@ -146,6 +165,29 @@ describe('Catalogs Module', () => {
     // cat_hidden_home deve ter showInHome: false para o Nuvio exibir apenas em Coleções
     assert.equal(manifest.catalogs[2].id, 'cat_hidden_home');
     assert.equal(manifest.catalogs[2].showInHome, false);
+  });
+
+  it('deve gerar IDs distintos para catálogos do mesmo addon com mesmo originalId mas tipos diferentes (ex: movie e series)', () => {
+    const config = {
+      addons: [
+        {
+          name: 'FenixFlix',
+          enabled: true,
+          catalogs: [
+            { id: 'populares_fenix', type: 'movie', name: 'Filmes Populares' },
+            { id: 'populares_fenix', type: 'series', name: 'Séries Populares' }
+          ]
+        }
+      ]
+    };
+
+    const manifest = generateManifest(config);
+    assert.equal(manifest.catalogs.length, 2);
+    assert.equal(manifest.catalogs[0].id, 'a0_movie__populares_fenix');
+    assert.equal(manifest.catalogs[0].type, 'movie');
+    assert.equal(manifest.catalogs[1].id, 'a0_series__populares_fenix');
+    assert.equal(manifest.catalogs[1].type, 'series');
+    assert.notEqual(manifest.catalogs[0].id, manifest.catalogs[1].id);
   });
 });
 
