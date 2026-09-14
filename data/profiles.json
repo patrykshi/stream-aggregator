@@ -3,7 +3,127 @@
     "name": "Principal",
     "updatedAt": "2026-09-14T01:03:18.965Z",
     "config": {
-      "addons": [],
+      "addons": [
+        {
+          "name": "Torrentio TB",
+          "url": "https://torrentio.strem.fun/providers=comando,bludv,micoleaodublado|language=portuguese|torbox=d772d1dc-4e3e-4e18-85f0-3f32ea3e1ee0/manifest.json",
+          "timeoutMs": 7000,
+          "enabled": true,
+          "resources": [
+            "stream",
+            "meta"
+          ],
+          "catalogs": [],
+          "includeCatalogs": false
+        },
+        {
+          "name": "BestCine",
+          "url": "https://bestcine.dpdns.org/manifest.json",
+          "timeoutMs": 7000,
+          "enabled": true,
+          "resources": [
+            "catalog",
+            "meta",
+            "stream"
+          ],
+          "catalogs": [
+            {
+              "id": "populares",
+              "type": "movie",
+              "name": "Filmes Populares"
+            },
+            {
+              "id": "populares_series",
+              "type": "series",
+              "name": "Séries Populares"
+            }
+          ],
+          "includeCatalogs": true
+        },
+        {
+          "name": "Fenix Apoiadores",
+          "url": "https://fenixflix-ur9u.onrender.com/manifest.json",
+          "timeoutMs": 7000,
+          "enabled": true,
+          "resources": [
+            "stream",
+            "catalog"
+          ],
+          "catalogs": [
+            {
+              "id": "populares_fenix",
+              "type": "movie",
+              "name": "Filmes Populares"
+            },
+            {
+              "id": "populares_fenix",
+              "type": "series",
+              "name": "Séries Populares"
+            }
+          ],
+          "includeCatalogs": true
+        },
+        {
+          "name": "Emby (Patryk)",
+          "url": "https://bridge.patrykrocha.com/manifest.json",
+          "timeoutMs": 7000,
+          "enabled": true,
+          "resources": [
+            "catalog",
+            "meta",
+            "stream"
+          ],
+          "catalogs": [],
+          "includeCatalogs": false
+        },
+        {
+          "name": "Nyaa Anime BR",
+          "url": "https://stremio-br-anime.onrender.com/u_a6WMW3SaTovkWTI_FT5kUr4JiF2Ix7op/manifest.json",
+          "timeoutMs": 7000,
+          "enabled": true,
+          "resources": [
+            "stream"
+          ],
+          "catalogs": [],
+          "includeCatalogs": false
+        },
+        {
+          "name": "PopPlay",
+          "url": "https://site--popplay--rg2h4m5nr425.code.run/manifest.json",
+          "timeoutMs": 7000,
+          "enabled": true,
+          "resources": [
+            "stream"
+          ],
+          "catalogs": [],
+          "includeCatalogs": false
+        },
+        {
+          "name": "Zeus",
+          "url": "https://398fe185fed6-zeus.baby-beamup.club/v1-p64f-q3j-a3-mb-c1/manifest.json",
+          "timeoutMs": 7000,
+          "enabled": true,
+          "resources": [
+            "stream",
+            "subtitles",
+            "catalog",
+            "meta"
+          ],
+          "catalogs": [],
+          "includeCatalogs": false
+        },
+        {
+          "name": "OpenSubtitles v3",
+          "url": "https://opensubtitles-v3.strem.io/manifest.json",
+          "timeoutMs": 7000,
+          "enabled": true,
+          "resources": [
+            "subtitles"
+          ],
+          "catalogs": [],
+          "includeCatalogs": false
+        }
+      ],
       "customCatalogs": [],
       "nuvioCollections": [
         {

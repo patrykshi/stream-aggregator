@@ -109,14 +109,20 @@ export function deduplicateStreams(streams) {
 // Mapeamento de ícones e logotipos dos addons mais populares
 const ADDON_ICONS = {
   torrentio: '⚡',
-  mediafusion: '🎬',
-  comet: '☄️',
+  fenix: '🔥',
+  fenixflix: '🔥',
   bestcine: '🍿',
   best: '🍿',
   cine: '🍿',
+  popplay: '▶️',
+  nyaa: '🌸',
+  anime: '🌸',
+  zeus: '⚡',
   froststream: '❄️',
   frost: '❄️',
   emby: '🟢',
+  mediafusion: '🎬',
+  comet: '☄️',
   stremthru: '🚀',
   cinemeta: '📽️',
   cyberflix: '🎞️',
@@ -152,7 +158,9 @@ export function enrichStreamBadge(stream, addonName, badgeFormat = 'addon') {
   if (badgeFormat === 'addon') {
     // Insere o badge com ícone no nome do addon ou no topo do título
     if (copy.name) {
-      copy.name = `${tag} ${copy.name}`;
+      if (!copy.name.includes(tag)) {
+        copy.name = `${tag} ${copy.name}`;
+      }
     } else {
       copy.name = tag;
     }

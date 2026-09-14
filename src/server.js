@@ -21,7 +21,8 @@ const PORT = process.env.PORT || 7001;
 
 // Middlewares
 app.use(cors({ origin: '*' }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Rota de Health Check
@@ -241,6 +242,62 @@ app.get('/manifest.json', (req, res) => {
   res.json(generateManifest(config));
 });
 
+// Stremio: Stream raiz (perfil main)
+app.get('/stream/:type/:id.json', async (req, res) => {
+  const { type, id } = req.params;
+  const config = getProfileConfig('main') || getDefaultConfig();
+  try {
+    const result = await aggregateStreams(config, type, id);
+    res.setHeader('Cache-Control', 'max-age=60, stale-while-revalidate=120');
+    res.json(result);
+  } catch (err) {
+    console.error('[Root Stream] Erro ao agregar streams:', err);
+    res.status(500).json({ streams: [], error: err.message });
+  }
+});
+
+// Stremio: Subtitles raiz (perfil main)
+app.get(['/subtitles/:type/:id.json', '/subtitles/:type/:id/:extra.json'], async (req, res) => {
+  const { type, id, extra } = req.params;
+  const config = getProfileConfig('main') || getDefaultConfig();
+  try {
+    const result = await aggregateSubtitles(config, type, id, extra || '');
+    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+    res.json(result);
+  } catch (err) {
+    console.error('[Root Subtitles] Erro ao agregar legendas:', err);
+    res.status(500).json({ subtitles: [], error: err.message });
+  }
+});
+
+// Stremio: Catalog raiz (perfil main)
+app.get(['/catalog/:type/:id.json', '/catalog/:type/:id/:extra.json'], async (req, res) => {
+  const { type, id, extra } = req.params;
+  const config = getProfileConfig('main') || getDefaultConfig();
+  try {
+    const result = await fetchCatalog(config, type, id, extra || '');
+    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+    res.json(result);
+  } catch (err) {
+    console.error('[Root Catalog] Erro ao consultar catálogo:', err);
+    res.status(500).json({ metas: [], error: err.message });
+  }
+});
+
+// Stremio: Meta raiz (perfil main)
+app.get('/meta/:type/:id.json', async (req, res) => {
+  const { type, id } = req.params;
+  const config = getProfileConfig('main') || getDefaultConfig();
+  try {
+    const result = await fetchMeta(config, type, id);
+    res.setHeader('Cache-Control', 'max-age=3600, stale-while-revalidate=7200');
+    res.json(result);
+  } catch (err) {
+    console.error('[Root Meta] Erro ao consultar metadados:', err);
+    res.status(500).json({ meta: null, error: err.message });
+  }
+});
+
 // Nuvio: Collections raiz (perfil main)
 app.get('/collections.json', (req, res) => {
   const config = getProfileConfig('main') || getDefaultConfig();
@@ -249,19 +306,19 @@ app.get('/collections.json', (req, res) => {
 });
 
 // ==========================================================================
-// ROTAS PARAMÉTRICAS COM TOKEN (Retrocompatibilidade 100%)
+// ROTAS PARAMÉTRICAS COM TOKEN OU ALIAS DE PERFIL (Retrocompatibilidade 100%)
 // ==========================================================================
 
-// Stremio: Manifest configurado via token
+// Stremio: Manifest configurado via token ou perfil
 app.get('/:config/manifest.json', (req, res) => {
-  const config = decodeConfig(req.params.config);
+  const config = resolveConfig(req.params.config);
   res.json(generateManifest(config));
 });
 
 // Stremio: Stream endpoint
 app.get('/:config/stream/:type/:id.json', async (req, res) => {
   const { config: rawConfig, type, id } = req.params;
-  const config = decodeConfig(rawConfig);
+  const config = resolveConfig(rawConfig);
 
   try {
     const result = await aggregateStreams(config, type, id);
@@ -276,7 +333,7 @@ app.get('/:config/stream/:type/:id.json', async (req, res) => {
 // Stremio: Subtitles endpoint
 app.get(['/:config/subtitles/:type/:id.json', '/:config/subtitles/:type/:id/:extra.json'], async (req, res) => {
   const { config: rawConfig, type, id, extra } = req.params;
-  const config = decodeConfig(rawConfig);
+  const config = resolveConfig(rawConfig);
 
   try {
     const result = await aggregateSubtitles(config, type, id, extra || '');
@@ -291,7 +348,7 @@ app.get(['/:config/subtitles/:type/:id.json', '/:config/subtitles/:type/:id/:ext
 // Stremio: Catalog endpoint
 app.get(['/:config/catalog/:type/:id.json', '/:config/catalog/:type/:id/:extra.json'], async (req, res) => {
   const { config: rawConfig, type, id, extra } = req.params;
-  const config = decodeConfig(rawConfig);
+  const config = resolveConfig(rawConfig);
 
   try {
     const result = await fetchCatalog(config, type, id, extra || '');
@@ -306,7 +363,7 @@ app.get(['/:config/catalog/:type/:id.json', '/:config/catalog/:type/:id/:extra.j
 // Stremio: Meta endpoint
 app.get('/:config/meta/:type/:id.json', async (req, res) => {
   const { config: rawConfig, type, id } = req.params;
-  const config = decodeConfig(rawConfig);
+  const config = resolveConfig(rawConfig);
 
   try {
     const result = await fetchMeta(config, type, id);
@@ -318,10 +375,10 @@ app.get('/:config/meta/:type/:id.json', async (req, res) => {
   }
 });
 
-// Nuvio Collections Endpoint com token
+// Nuvio Collections Endpoint com token ou perfil
 app.get('/:config/collections.json', (req, res) => {
   const { config: rawConfig } = req.params;
-  const config = decodeConfig(rawConfig);
+  const config = resolveConfig(rawConfig);
   res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
   res.json(config.nuvioCollections || []);
 });

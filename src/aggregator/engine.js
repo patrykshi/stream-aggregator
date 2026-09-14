@@ -52,9 +52,9 @@ async function fetchAddonStreams(addon, type, id) {
   }
 
   const streamUrl = parsed.getStreamUrl(type, id);
-  // Garante pelo menos 22s de timeout mesmo se tokens antigos tiverem 7000ms salvos
-  const configuredTimeout = typeof addon.timeoutMs === 'number' ? addon.timeoutMs : 25000;
-  const timeoutMs = Math.max(configuredTimeout, 22000);
+  // Timeout ágil para streams (máximo 7500ms para responder antes do timeout estrito do Stremio/Nuvio)
+  const configuredTimeout = typeof addon.timeoutMs === 'number' ? addon.timeoutMs : 7000;
+  const timeoutMs = Math.min(Math.max(configuredTimeout, 3000), 7500);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -99,7 +99,11 @@ async function fetchAddonStreams(addon, type, id) {
  * Executa a agregação de streams de múltiplos addons.
  */
 export async function aggregateStreams(config, type, id) {
-  const activeAddons = config.addons.filter(a => a.enabled !== false);
+  const activeAddons = (config.addons || []).filter(a => {
+    if (a.enabled === false) return false;
+    const resources = a.resources || ['stream'];
+    return resources.includes('stream');
+  });
   if (activeAddons.length === 0) {
     return { streams: [] };
   }
