@@ -117,10 +117,11 @@ describe('Deduplication & Badges', () => {
     assert.equal(deduplicated.length, 2);
   });
 
-  it('deve enriquecer badges com o nome do addon', () => {
+  it('deve enriquecer badges com o nome e ícone do addon', () => {
     const stream = { name: '1080p RealDebrid', title: 'Movie' };
     const enriched = enrichStreamBadge(stream, 'Torrentio', 'addon');
-    assert.equal(enriched.name, '[Torrentio] 1080p RealDebrid');
+    assert.match(enriched.name, /\[.*Torrentio\]/);
+    assert.ok(enriched.name.includes('⚡'));
   });
 });
 

@@ -17,11 +17,24 @@
         <div class="logo-icon">⚡</div>
         <div class="logo-text">
           <h1>Stream Aggregator</h1>
-          <p class="subtitle">Agregador Universal de Manifests & Streams para Stremio</p>
+          <p class="subtitle">Hub Unificado de Addons, Catálogos e Coleções para Stremio & Nuvio</p>
         </div>
       </div>
-      <div class="header-badges">
-        <span class="badge badge-pulse">Stremio & Nuvio Ready</span>
+      <div class="header-profile-bar">
+        <div class="profile-selector-group">
+          <label for="profileSelect" class="profile-label">👤 Perfil Ativo:</label>
+          <select id="profileSelect" class="select-profile">
+            <option value="main">Principal (main)</option>
+          </select>
+          <button type="button" id="btnNewProfile" class="btn btn-secondary btn-small" title="Criar novo perfil (ex: Sala, Quarto, Kids)">+ Novo</button>
+          <button type="button" id="btnDeleteProfile" class="btn-icon delete btn-small" title="Excluir este perfil" style="display:none;">🗑</button>
+        </div>
+        <div class="profile-actions">
+          <button type="button" id="btnSaveServerProfile" class="btn btn-primary btn-small" title="Salva permanentemente as configurações deste perfil no servidor e sincroniza na hora">
+            ☁️ Salvar no Servidor
+          </button>
+          <span id="profileSyncStatus" class="sync-status-badge">✓ Sincronizado</span>
+        </div>
       </div>
     </header>
 
@@ -163,25 +176,38 @@
 
         <!-- Card de Instalação e Links -->
         <section class="card highlight-card">
-          <div class="card-header">
-            <h2>3. Instalar no Stremio</h2>
+          <div class="card-header flex-header">
+            <div>
+              <h2>3. Instalar no Stremio & Sincronização Direta</h2>
+              <p class="card-desc">Instale uma única vez. Ao editar addons, catálogos ou coleções neste perfil, todos os seus dispositivos atualizam <strong>automaticamente</strong> sem precisar reinstalar!</p>
+            </div>
+            <div class="url-mode-badges">
+              <span class="badge" style="background:var(--success); color:#000; font-weight:700;">✓ Sincronização Ativa</span>
+            </div>
           </div>
-          <p class="card-desc">Sua URL de manifest única é gerada automaticamente com todas as suas preferências.</p>
 
           <div class="install-actions">
             <a id="btnInstallStremio" href="#" class="btn btn-stremio btn-large">
               🎬 Instalar no Stremio
             </a>
             <button type="button" id="btnCopyUrl" class="btn btn-secondary btn-large">
-              📋 Copiar Manifest
+              📋 Copiar Manifest Curto
             </button>
           </div>
 
           <div class="manifest-preview">
-            <label class="section-label">URL do seu Manifest:</label>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label class="section-label" style="margin:0;">URL Curta do Perfil (Fixa & Sincronizada):</label>
+              <button type="button" id="btnToggleUrlType" class="btn-link-action" style="font-size:11px; background:none; border:none; color:var(--primary); cursor:pointer; text-decoration:underline;">
+                Alternar para URL Portátil (com Token)
+              </button>
+            </div>
             <div class="url-box">
               <input type="text" id="manifestUrlDisplay" readonly value="">
             </div>
+            <small style="color:var(--text-muted); font-size:11px; margin-top:4px; display:block;">
+              💡 Dica: Esta URL limpa tem menos de 50 caracteres e atualiza automaticamente na sua TV ao salvar.
+            </small>
           </div>
         </section>
       </div>

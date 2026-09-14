@@ -10,6 +10,8 @@ services:
     environment:
       - PORT=7001
       - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
     logging:
       driver: "json-file"
       options:

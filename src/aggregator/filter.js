@@ -106,8 +106,39 @@ export function deduplicateStreams(streams) {
   return result;
 }
 
+// Mapeamento de ícones e logotipos dos addons mais populares
+const ADDON_ICONS = {
+  torrentio: '⚡',
+  mediafusion: '🎬',
+  comet: '☄️',
+  bestcine: '🍿',
+  best: '🍿',
+  cine: '🍿',
+  froststream: '❄️',
+  frost: '❄️',
+  emby: '🟢',
+  stremthru: '🚀',
+  cinemeta: '📽️',
+  cyberflix: '🎞️',
+  opensubtitles: '💬',
+  easynews: '📰',
+  torbox: '📦',
+  realdebrid: '👑',
+  alldebrid: '💎',
+  premiumize: '⭐'
+};
+
+function getAddonIcon(name) {
+  if (!name) return '⚡';
+  const clean = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const [key, icon] of Object.entries(ADDON_ICONS)) {
+    if (clean.includes(key)) return icon;
+  }
+  return '⚡';
+}
+
 /**
- * Enriquece os metadados do stream com o nome do addon de origem.
+ * Enriquece os metadados do stream com o nome e ícone do addon de origem.
  */
 export function enrichStreamBadge(stream, addonName, badgeFormat = 'addon') {
   if (badgeFormat === 'none' || !addonName) {
@@ -115,10 +146,11 @@ export function enrichStreamBadge(stream, addonName, badgeFormat = 'addon') {
   }
 
   const copy = { ...stream };
-  const tag = `[${addonName}]`;
+  const icon = getAddonIcon(addonName);
+  const tag = `[${icon} ${addonName}]`;
 
   if (badgeFormat === 'addon') {
-    // Insere o badge no nome do addon ou no topo do título
+    // Insere o badge com ícone no nome do addon ou no topo do título
     if (copy.name) {
       copy.name = `${tag} ${copy.name}`;
     } else {

@@ -92,7 +92,18 @@ const subSpa = document.getElementById('subSpa');
 const btnInstallStremio = document.getElementById('btnInstallStremio');
 const btnCopyUrl = document.getElementById('btnCopyUrl');
 const manifestUrlDisplay = document.getElementById('manifestUrlDisplay');
+const btnToggleUrlType = document.getElementById('btnToggleUrlType');
 const toastEl = document.getElementById('toast');
+
+// Perfil DOM
+const profileSelect = document.getElementById('profileSelect');
+const btnNewProfile = document.getElementById('btnNewProfile');
+const btnDeleteProfile = document.getElementById('btnDeleteProfile');
+const btnSaveServerProfile = document.getElementById('btnSaveServerProfile');
+const profileSyncStatus = document.getElementById('profileSyncStatus');
+
+let currentProfileId = 'main';
+let useShortProfileUrl = true;
 
 // Modal DOM - Addon Settings
 const addonSettingsModal = document.getElementById('addonSettingsModal');
@@ -1537,27 +1548,49 @@ async function updateManifestUrl() {
     deduplicate: state.filters.deduplicate
   };
 
-  try {
-    const res = await fetch('/api/encode-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(configToEncode)
-    });
-    const { token } = await res.json();
+  const origin = window.location.origin;
+  const hostWithPort = window.location.host;
 
-    const origin = window.location.origin;
-    const manifestHttpsUrl = `${origin}/${token}/manifest.json`;
-    const collectionsHttpsUrl = `${origin}/${token}/collections.json`;
-    const hostWithPort = window.location.host;
-    const stremioProtocolUrl = `stremio://${hostWithPort}/${token}/manifest.json`;
+  if (useShortProfileUrl) {
+    // URL curta e direta sincronizada pelo perfil
+    const pathPrefix = currentProfileId === 'main' ? '' : `/p/${currentProfileId}`;
+    const shortManifestUrl = `${origin}${pathPrefix}/manifest.json`;
+    const shortCollectionsUrl = `${origin}${pathPrefix}/collections.json`;
+    const shortStremioUrl = `stremio://${hostWithPort}${pathPrefix}/manifest.json`;
 
-    manifestUrlDisplay.value = manifestHttpsUrl;
+    manifestUrlDisplay.value = shortManifestUrl;
     if (collectionsUrlDisplay) {
-      collectionsUrlDisplay.value = collectionsHttpsUrl;
+      collectionsUrlDisplay.value = shortCollectionsUrl;
     }
-    btnInstallStremio.href = stremioProtocolUrl;
-  } catch (err) {
-    console.error('Falha ao gerar URL de manifest:', err);
+    btnInstallStremio.href = shortStremioUrl;
+    if (btnToggleUrlType) {
+      btnToggleUrlType.textContent = 'Alternar para URL Portátil (com Token longo)';
+    }
+  } else {
+    // URL longa com token embutido (portátil)
+    try {
+      const res = await fetch('/api/encode-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configToEncode)
+      });
+      const { token } = await res.json();
+
+      const manifestHttpsUrl = `${origin}/${token}/manifest.json`;
+      const collectionsHttpsUrl = `${origin}/${token}/collections.json`;
+      const stremioProtocolUrl = `stremio://${hostWithPort}/${token}/manifest.json`;
+
+      manifestUrlDisplay.value = manifestHttpsUrl;
+      if (collectionsUrlDisplay) {
+        collectionsUrlDisplay.value = collectionsHttpsUrl;
+      }
+      btnInstallStremio.href = stremioProtocolUrl;
+      if (btnToggleUrlType) {
+        btnToggleUrlType.textContent = '✓ Alternar para URL Curta do Perfil (Recomendada)';
+      }
+    } catch (err) {
+      console.error('Falha ao gerar URL com token:', err);
+    }
   }
 }
 
@@ -1595,7 +1628,231 @@ function saveToStorage() {
   }
 }
 
+// ==========================================================================
+// GERENCIADOR DE PERFIS (Sincronização Direta)
+// ==========================================================================
+
+function setProfileSyncStatus(isSyncing, text = '✓ Sincronizado') {
+  if (!profileSyncStatus) return;
+  profileSyncStatus.textContent = text;
+  if (isSyncing) {
+    profileSyncStatus.classList.add('syncing');
+  } else {
+    profileSyncStatus.classList.remove('syncing');
+  }
+}
+
+async function loadProfilesList() {
+  if (!profileSelect) return;
+  try {
+    const res = await fetch('/api/profiles');
+    const data = await res.json();
+    if (data && Array.isArray(data.profiles)) {
+      profileSelect.innerHTML = '';
+      data.profiles.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.name} (${p.id})`;
+        if (p.id === currentProfileId) opt.selected = true;
+        profileSelect.appendChild(opt);
+      });
+      if (btnDeleteProfile) {
+        btnDeleteProfile.style.display = currentProfileId === 'main' ? 'none' : 'inline-flex';
+      }
+    }
+  } catch (err) {
+    console.warn('[Profiles] Erro ao listar perfis:', err);
+  }
+}
+
+async function switchProfile(newProfileId) {
+  if (!newProfileId || newProfileId === currentProfileId) return;
+  setProfileSyncStatus(true, 'Carregando perfil...');
+
+  try {
+    const res = await fetch(`/api/profiles/${newProfileId}`);
+    const data = await res.json();
+    if (data && data.profile && data.profile.config) {
+      currentProfileId = newProfileId;
+      applyConfigToState(data.profile.config);
+      render();
+      saveToStorage();
+      setProfileSyncStatus(false, '✓ Perfil Carregado');
+      showToast(`Perfil alterado para "${data.profile.name || newProfileId}"!`);
+      if (btnDeleteProfile) {
+        btnDeleteProfile.style.display = currentProfileId === 'main' ? 'none' : 'inline-flex';
+      }
+    }
+  } catch (err) {
+    showToast('Erro ao carregar perfil.');
+    setProfileSyncStatus(false, 'Erro ao sincronizar');
+  }
+}
+
+async function saveCurrentProfileToServer() {
+  setProfileSyncStatus(true, 'Salvando na nuvem...');
+  if (btnSaveServerProfile) btnSaveServerProfile.disabled = true;
+
+  const configToSave = {
+    addons: state.addons.map(a => ({
+      name: a.name,
+      url: a.url,
+      timeoutMs: a.timeoutMs || 25000,
+      enabled: a.enabled !== false,
+      resources: a.resources || ['stream'],
+      catalogs: a.catalogs || [],
+      includeCatalogs: a.includeCatalogs !== false
+    })),
+    customCatalogs: state.customCatalogs,
+    nuvioCollections: state.nuvioCollections,
+    filters: state.filters,
+    badgeFormat: state.badgeFormat,
+    deduplicate: state.filters.deduplicate !== false
+  };
+
+  const selectedOpt = profileSelect ? profileSelect.options[profileSelect.selectedIndex] : null;
+  const currentName = selectedOpt ? selectedOpt.textContent.split(' (')[0] : (currentProfileId === 'main' ? 'Principal' : currentProfileId);
+
+  try {
+    const res = await fetch(`/api/profiles/${currentProfileId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentName, config: configToSave })
+    });
+    const result = await res.json();
+    if (result.success) {
+      setProfileSyncStatus(false, '✓ Sincronizado');
+      showToast(`Perfil "${currentName}" salvo no servidor! Stremio e Nuvio atualizados.`);
+      await loadProfilesList();
+      updateManifestUrl();
+    } else {
+      setProfileSyncStatus(false, 'Erro ao salvar');
+      showToast('Falha ao salvar perfil no servidor.');
+    }
+  } catch (err) {
+    setProfileSyncStatus(false, 'Erro de rede');
+    showToast('Erro de comunicação ao salvar perfil.');
+  } finally {
+    if (btnSaveServerProfile) btnSaveServerProfile.disabled = false;
+  }
+}
+
+async function createNewProfile() {
+  const name = prompt('Nome do novo perfil (ex: "Sala de Estar", "Quarto", "Kids"):');
+  if (!name || !name.trim()) return;
+
+  const id = name.trim().toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || `perfil-${Date.now()}`;
+  
+  // Clona o estado atual para o novo perfil
+  const configToSave = {
+    addons: state.addons,
+    customCatalogs: state.customCatalogs,
+    nuvioCollections: state.nuvioCollections,
+    filters: state.filters,
+    badgeFormat: state.badgeFormat,
+    deduplicate: state.filters.deduplicate !== false
+  };
+
+  setProfileSyncStatus(true, 'Criando perfil...');
+  try {
+    const res = await fetch(`/api/profiles/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), config: configToSave })
+    });
+    const result = await res.json();
+    if (result.success) {
+      currentProfileId = id;
+      await loadProfilesList();
+      profileSelect.value = id;
+      setProfileSyncStatus(false, '✓ Perfil Criado');
+      showToast(`Novo perfil "${name.trim()}" criado com sucesso!`);
+      updateManifestUrl();
+      if (btnDeleteProfile) btnDeleteProfile.style.display = 'inline-flex';
+    }
+  } catch (err) {
+    showToast('Erro ao criar novo perfil.');
+  }
+}
+
+async function deleteCurrentProfile() {
+  if (currentProfileId === 'main') {
+    showToast('O perfil Principal não pode ser excluído.');
+    return;
+  }
+  if (!confirm(`Deseja realmente excluir o perfil "${currentProfileId}"?`)) return;
+
+  try {
+    const res = await fetch(`/api/profiles/${currentProfileId}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) {
+      showToast('Perfil excluído!');
+      currentProfileId = 'main';
+      await loadProfilesList();
+      profileSelect.value = 'main';
+      await switchProfile('main');
+    } else {
+      showToast(result.error || 'Erro ao excluir perfil.');
+    }
+  } catch (err) {
+    showToast('Erro ao excluir perfil.');
+  }
+}
+
+function applyConfigToState(config) {
+  if (!config) return;
+  if (Array.isArray(config.addons)) {
+    state.addons = config.addons.map((a, i) => ({
+      id: String(i),
+      name: a.name,
+      url: a.url,
+      timeoutMs: (a.timeoutMs && a.timeoutMs >= 20000) ? a.timeoutMs : 25000,
+      enabled: a.enabled !== false,
+      resources: Array.isArray(a.resources) && a.resources.length > 0 ? a.resources : ['stream'],
+      catalogs: Array.isArray(a.catalogs) ? a.catalogs : [],
+      includeCatalogs: a.includeCatalogs !== false,
+      status: 'online'
+    }));
+  }
+  if (Array.isArray(config.customCatalogs)) {
+    state.customCatalogs = config.customCatalogs;
+  }
+  if (Array.isArray(config.nuvioCollections)) {
+    state.nuvioCollections = config.nuvioCollections;
+  }
+  if (config.filters) state.filters = { ...state.filters, ...config.filters };
+  if (config.badgeFormat) state.badgeFormat = config.badgeFormat;
+  syncDomFromFilters();
+}
+
+function setupProfileListeners() {
+  if (profileSelect) {
+    profileSelect.addEventListener('change', (e) => {
+      switchProfile(e.target.value);
+    });
+  }
+  if (btnSaveServerProfile) {
+    btnSaveServerProfile.addEventListener('click', saveCurrentProfileToServer);
+  }
+  if (btnNewProfile) {
+    btnNewProfile.addEventListener('click', createNewProfile);
+  }
+  if (btnDeleteProfile) {
+    btnDeleteProfile.addEventListener('click', deleteCurrentProfile);
+  }
+  if (btnToggleUrlType) {
+    btnToggleUrlType.addEventListener('click', () => {
+      useShortProfileUrl = !useShortProfileUrl;
+      updateManifestUrl();
+      showToast(useShortProfileUrl ? 'Modo URL Curta ativado!' : 'Modo URL Portátil ativado!');
+    });
+  }
+}
+
 async function loadInitialState() {
+  setupProfileListeners();
+  await loadProfilesList();
+
   // 1. Tenta carregar do hash da URL se houver (ex: #token=TOKEN)
   const hash = window.location.hash;
   if (hash && hash.includes('token=')) {
@@ -1605,26 +1862,8 @@ async function loadInitialState() {
         const res = await fetch(`/api/decode-config/${token}`);
         const { config } = await res.json();
         if (config && config.addons) {
-          state.addons = config.addons.map((a, i) => ({
-            id: String(i),
-            name: a.name,
-            url: a.url,
-            timeoutMs: (a.timeoutMs && a.timeoutMs >= 20000) ? a.timeoutMs : 25000,
-            enabled: a.enabled !== false,
-            resources: Array.isArray(a.resources) && a.resources.length > 0 ? a.resources : ['stream'],
-            catalogs: Array.isArray(a.catalogs) ? a.catalogs : [],
-            includeCatalogs: a.includeCatalogs !== false,
-            status: 'online'
-          }));
-          if (Array.isArray(config.customCatalogs)) {
-            state.customCatalogs = config.customCatalogs;
-          }
-          if (Array.isArray(config.nuvioCollections)) {
-            state.nuvioCollections = config.nuvioCollections;
-          }
-          if (config.filters) state.filters = { ...state.filters, ...config.filters };
-          if (config.badgeFormat) state.badgeFormat = config.badgeFormat;
-          syncDomFromFilters();
+          applyConfigToState(config);
+          useShortProfileUrl = false; // Usuário veio com token explícito
           return;
         }
       } catch (err) {
@@ -1633,34 +1872,34 @@ async function loadInitialState() {
     }
   }
 
-  // 2. Carrega do localStorage
+  // 2. Tenta carregar do servidor o perfil ativo (main)
+  try {
+    const profileRes = await fetch(`/api/profiles/${currentProfileId}`);
+    if (profileRes.ok) {
+      const data = await profileRes.json();
+      if (data && data.profile && data.profile.config && data.profile.config.addons && data.profile.config.addons.length > 0) {
+        applyConfigToState(data.profile.config);
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('[Profiles] Servidor offline ou sem perfil, recorrendo ao localStorage.');
+  }
+
+  // 3. Fallback: Carrega do localStorage se houver
   let loadedFromStorage = false;
   try {
     const saved = localStorage.getItem('stream_aggregator_state');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed.addons) && parsed.addons.length > 0) {
-        state.addons = parsed.addons.map(a => ({
-          ...a,
-          timeoutMs: (a.timeoutMs && a.timeoutMs >= 20000) ? a.timeoutMs : 25000,
-          resources: Array.isArray(a.resources) && a.resources.length > 0 ? a.resources : ['stream'],
-          catalogs: Array.isArray(a.catalogs) ? a.catalogs : [],
-          includeCatalogs: a.includeCatalogs !== false
-        }));
+        applyConfigToState(parsed);
         loadedFromStorage = true;
       }
-      if (Array.isArray(parsed.customCatalogs)) {
-        state.customCatalogs = parsed.customCatalogs;
-      }
-      if (Array.isArray(parsed.nuvioCollections) && parsed.nuvioCollections.length > 0) {
-        state.nuvioCollections = parsed.nuvioCollections;
-      }
-      if (parsed.filters) state.filters = { ...state.filters, ...parsed.filters };
-      if (parsed.badgeFormat) state.badgeFormat = parsed.badgeFormat;
     }
   } catch (e) {}
 
-  // 3. Se ainda não tiver coleções carregadas, carrega as coleções padrão para o Nuvio
+  // 4. Se ainda não tiver coleções carregadas, carrega as coleções padrão para o Nuvio
   if (!state.nuvioCollections || state.nuvioCollections.length === 0) {
     try {
       const defaultColResp = await fetch('/default-nuvio-collections.json');
@@ -1672,4 +1911,5 @@ async function loadInitialState() {
 
   syncDomFromFilters();
 }
+
 

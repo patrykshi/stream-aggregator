@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { encodeConfig, decodeConfig, getDefaultConfig } from './config/codec.js';
+import { listProfiles, getProfile, getProfileConfig, saveProfile, deleteProfile } from './config/profiles.js';
 import { aggregateStreams, normalizeAddonBaseUrl } from './aggregator/engine.js';
 import { generateManifest } from './aggregator/manifest.js';
 import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './aggregator/url-helper.js';
@@ -114,13 +115,144 @@ app.get('/api/decode-config/:token', (req, res) => {
   res.json({ config });
 });
 
-// Stremio: Manifest sem configuração
-app.get('/manifest.json', (req, res) => {
-  const def = getDefaultConfig();
-  res.json(generateManifest(def));
+// ==========================================================================
+// API REST DE PERFIS (Sincronização Direta)
+// ==========================================================================
+
+// Lista todos os perfis
+app.get('/api/profiles', (req, res) => {
+  res.json({ profiles: listProfiles() });
 });
 
-// Stremio: Manifest configurado
+// Obtém um perfil específico
+app.get('/api/profiles/:id', (req, res) => {
+  const profile = getProfile(req.params.id);
+  if (!profile) {
+    return res.status(404).json({ error: 'Perfil não encontrado.' });
+  }
+  res.json({ profile });
+});
+
+// Salva ou atualiza um perfil
+app.post('/api/profiles/:id', (req, res) => {
+  const { name, config } = req.body;
+  if (!config || typeof config !== 'object') {
+    return res.status(400).json({ error: 'Objeto de configuração inválido.' });
+  }
+  const result = saveProfile(req.params.id, { name, config });
+  res.json(result);
+});
+
+// Exclui um perfil
+app.delete('/api/profiles/:id', (req, res) => {
+  const result = deleteProfile(req.params.id);
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+  res.json(result);
+});
+
+// Helper para resolver configuração: se vier 'main' ou perfil salvo, usa do banco; senão, decodifica token
+function resolveConfig(param) {
+  if (!param) return getProfileConfig('main');
+  // Se existir perfil salvo com esse nome
+  const profileConfig = getProfileConfig(param);
+  if (profileConfig) {
+    return profileConfig;
+  }
+  // Fallback: decodifica como token
+  return decodeConfig(param);
+}
+
+// ==========================================================================
+// ROTAS DE PERFIS (URLs Curtas & Sincronizadas: /p/:profileId/...)
+// ==========================================================================
+
+app.get('/p/:profileId/manifest.json', (req, res) => {
+  const config = getProfileConfig(req.params.profileId) || getDefaultConfig();
+  res.json(generateManifest(config));
+});
+
+app.get('/p/:profileId/stream/:type/:id.json', async (req, res) => {
+  const { profileId, type, id } = req.params;
+  const config = getProfileConfig(profileId) || getDefaultConfig();
+  try {
+    const result = await aggregateStreams(config, type, id);
+    res.setHeader('Cache-Control', 'max-age=60, stale-while-revalidate=120');
+    res.json(result);
+  } catch (err) {
+    console.error(`[Profile ${profileId}] Erro ao agregar streams:`, err);
+    res.status(500).json({ streams: [], error: err.message });
+  }
+});
+
+app.get(['/p/:profileId/subtitles/:type/:id.json', '/p/:profileId/subtitles/:type/:id/:extra.json'], async (req, res) => {
+  const { profileId, type, id, extra } = req.params;
+  const config = getProfileConfig(profileId) || getDefaultConfig();
+  try {
+    const result = await aggregateSubtitles(config, type, id, extra || '');
+    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+    res.json(result);
+  } catch (err) {
+    console.error(`[Profile ${profileId}] Erro ao agregar legendas:`, err);
+    res.status(500).json({ subtitles: [], error: err.message });
+  }
+});
+
+app.get(['/p/:profileId/catalog/:type/:id.json', '/p/:profileId/catalog/:type/:id/:extra.json'], async (req, res) => {
+  const { profileId, type, id, extra } = req.params;
+  const config = getProfileConfig(profileId) || getDefaultConfig();
+  try {
+    const result = await fetchCatalog(config, type, id, extra || '');
+    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+    res.json(result);
+  } catch (err) {
+    console.error(`[Profile ${profileId}] Erro ao consultar catálogo:`, err);
+    res.status(500).json({ metas: [], error: err.message });
+  }
+});
+
+app.get('/p/:profileId/meta/:type/:id.json', async (req, res) => {
+  const { profileId, type, id } = req.params;
+  const config = getProfileConfig(profileId) || getDefaultConfig();
+  try {
+    const result = await fetchMeta(config, type, id);
+    res.setHeader('Cache-Control', 'max-age=3600, stale-while-revalidate=7200');
+    res.json(result);
+  } catch (err) {
+    console.error(`[Profile ${profileId}] Erro ao consultar metadados:`, err);
+    res.status(500).json({ meta: null, error: err.message });
+  }
+});
+
+app.get('/p/:profileId/collections.json', (req, res) => {
+  const config = getProfileConfig(req.params.profileId) || getDefaultConfig();
+  res.setHeader('Cache-Control', 'max-age=60, stale-while-revalidate=120');
+  res.json(config.nuvioCollections || []);
+});
+
+// ==========================================================================
+// ROTAS GLOBAIS RAIZ (Apontam para o Perfil 'main' por padrão)
+// ==========================================================================
+
+// Stremio: Manifest raiz (perfil main)
+app.get('/manifest.json', (req, res) => {
+  const config = getProfileConfig('main') || getDefaultConfig();
+  res.json(generateManifest(config));
+});
+
+// Nuvio: Collections raiz (perfil main)
+app.get('/collections.json', (req, res) => {
+  const config = getProfileConfig('main') || getDefaultConfig();
+  res.setHeader('Cache-Control', 'max-age=60, stale-while-revalidate=120');
+  res.json(config.nuvioCollections || []);
+});
+
+// ==========================================================================
+// ROTAS PARAMÉTRICAS COM TOKEN (Retrocompatibilidade 100%)
+// ==========================================================================
+
+// Stremio: Manifest configurado via token
 app.get('/:config/manifest.json', (req, res) => {
   const config = decodeConfig(req.params.config);
   res.json(generateManifest(config));
@@ -186,19 +318,12 @@ app.get('/:config/meta/:type/:id.json', async (req, res) => {
   }
 });
 
-// Nuvio Collections Endpoint (Permite importar/exportar a estrutura de coleções no Nuvio)
+// Nuvio Collections Endpoint com token
 app.get('/:config/collections.json', (req, res) => {
   const { config: rawConfig } = req.params;
   const config = decodeConfig(rawConfig);
   res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
   res.json(config.nuvioCollections || []);
-});
-
-// Fallback sem token para Nuvio Collections
-app.get('/collections.json', (req, res) => {
-  const def = getDefaultConfig();
-  res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
-  res.json(def.nuvioCollections || []);
 });
 
 // Página de configuração
