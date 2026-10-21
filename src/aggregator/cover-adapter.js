@@ -72,10 +72,24 @@ function canonicalCover(src) {
     return url.toString();
   } catch { return null; }
 }
-export function supportedCover(src) { return Boolean(canonicalCover(src)); }
+function isHubStudioArtwork(src) {
+  if (typeof src !== 'string' || !src.trim()) return false;
+  if (/^\/api\/hub\/artwork\/studio\/[a-zA-Z0-9_-]{8,80}\.webp$/i.test(src.trim())) return true;
+  try {
+    const u = new URL(src.trim());
+    return /^\/api\/hub\/artwork\/studio\/[a-zA-Z0-9_-]{8,80}\.webp$/i.test(u.pathname);
+  } catch { return false; }
+}
+function resolveHubStudioArtworkUrl(src) {
+  const trimmed = src.trim();
+  if (trimmed.startsWith('/')) return `${HOST}${trimmed}`;
+  return trimmed;
+}
+export function supportedCover(src) { return Boolean(canonicalCover(src) || isHubStudioArtwork(src)); }
 export function normalizeShape(shape) { return SHAPES[shape] ? shape : 'LANDSCAPE'; }
 export function dimensions(shape) { return {...SHAPES[normalizeShape(shape)]}; }
 export function registerCover(src,shape) {
+  if(isHubStudioArtwork(src)) return resolveHubStudioArtworkUrl(src);
   const source=canonicalCover(src);
   if(!source)return null;
   const kind=normalizeShape(shape);
@@ -94,12 +108,29 @@ export function prepareCoverCollections(collections) {
   // Batch save: at most one index write per collection export, not per URL.
   let dirty=false;
   for(const group of output) {
+    if(isHubStudioArtwork(group.backdropImageUrl)) {
+      group.backdropImageUrl=resolveHubStudioArtworkUrl(group.backdropImageUrl);
+    }
+    if(isHubStudioArtwork(group.coverImageUrl)) {
+      group.coverImageUrl=resolveHubStudioArtworkUrl(group.coverImageUrl);
+    }
     for(const folder of group.folders||[]) {
       const source=folder.customCoverImageUrl || folder.coverImageUrl;
+      const requested=normalizeShape(folder.tileShape || group.tileShape);
+      if(!folder.tileShape && group.tileShape) {
+        folder.tileShape=requested==='PORTRAIT'?'POSTER':requested;
+      }
       if(!source)continue;
+      if(isHubStudioArtwork(source)) {
+        folder.tileShape=requested==='PORTRAIT'?'POSTER':requested;
+        const resolved=resolveHubStudioArtworkUrl(source);
+        folder.coverImageUrl=resolved;
+        folder.customCoverImageUrl=resolved;
+        adapted++;
+        continue;
+      }
       const parsed=canonicalCover(source);
       if(!parsed) {unsupported++;continue;}
-      const requested=normalizeShape(folder.tileShape);
       // O Nuvio Legacy não reconhece PORTRAIT; desconhecidos viram SQUARE.
       // A melhor correspondência vertical é POSTER (2:3), sem recortar a arte.
       const shape=requested==='PORTRAIT'?'POSTER':requested;

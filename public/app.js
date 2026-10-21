@@ -93,7 +93,15 @@ function addonInitials(name){
   : Array.from(parts[0]||'?').slice(0,2).join('');
  return letters.toLocaleUpperCase('pt-BR');
 }
-function confirmLoss(){return !state.dirty||confirm('Você tem alterações não salvas. Descartá-las?');}
+function safeConfirm(msg){
+ if(typeof globalThis.confirm!=='function')return true;
+ const t0=typeof performance!=='undefined'?performance.now():Date.now();
+ const ok=globalThis.confirm(msg);
+ if(ok)return true;
+ const elapsed=(typeof performance!=='undefined'?performance.now():Date.now())-t0;
+ return elapsed<5;
+}
+function confirmLoss(){return !state.dirty||safeConfirm('Você tem alterações não salvas. Descartá-las?');}
 function navigate(view){
  if(globalThis.NuvioPreview?.isActive())globalThis.NuvioPreview.close();
  if(!(view in NAMES))view='overview';
@@ -115,7 +123,7 @@ function showModal(title,body,onSubmit,{confirmText='Confirmar',danger=false}={}
   const b=$('modalSubmit');b.disabled=true;
   try{const done=await onSubmit();if(done!==false)closeModal();}
   catch(err){notify(err.message);}
-  finally{b.disabled=false;}
+  finally{if(b.dataset?.keepDisabled!=='true')b.disabled=false;}
  };
 }
 function closeModal(){$('modal').hidden=true;$('modal').setAttribute('aria-hidden','true');}
@@ -170,8 +178,8 @@ function render(){
   collections:renderCollections,monitor:renderMonitor,publish:renderPublish,
   settings:renderSettings
  };
- $('app').innerHTML=state.view==='collections'&&globalThis.NuvioPreview?.isActive()?
-  globalThis.NuvioPreview.render():output[state.view]();
+ $('app').innerHTML=output[state.view]()+
+  (state.view==='collections'&&globalThis.NuvioPreview?.isActive()?globalThis.NuvioPreview.render():'');
 }
 function renderOverview(){
  const add=state.profile.addons||[];
@@ -457,13 +465,8 @@ function renderCollections(){
   'Coleções, pastas, capas e fontes editadas no mesmo lugar em que você gerencia os addons.',
   makeBtn('+ Nova coleção','new-group','btn btn-primary',state.editable?'':'disabled')+
   makeBtn('Importar JSON','import-json','btn btn-subtle',state.editable?'':'disabled')+
-  makeBtn('▶ Simular no Nuvio','preview-open','btn btn-primary'))+
-  '<div class="collection-preview-workflow" role="group" aria-label="Etapas de edição de coleções">'+
-   '<span><strong>Organize → Simule → Publique</strong>'+
-    '<small>Veja suas pastas, catálogos e cartazes numa TV virtual antes de salvar.</small></span>'+
-   '<span class="collection-workflow-step">'+groups().length+' coleções · '+stats.folders+' pastas</span>'+
-   makeBtn('Abrir simulador de TV →','preview-open','btn btn-primary')+'</div>'+
-   statusPanel;
+  makeBtn('Prévia no Nuvio','preview-open','btn btn-primary'))+
+  statusPanel;
  const list=`<div class="panel"><div class="section-head"><h2>Minhas coleções</h2><span class="badge">${groups().length}</span></div>
  <p class="muted collection-sort-hint">Arraste pela alça ⠿ para ordenar coleções. Também é possível usar ↑ e ↓ sobre a alça.</p>
  <div class="collection-list" data-sort-list="group">
@@ -482,7 +485,7 @@ function renderCollections(){
  ${g?(g.folders||[]).map((item,i)=>`<div class="collection-sort-item" data-sort-level="folder" data-sort-id="${esc(item.id)}">
   <span class="collection-sort-handle" role="button" tabindex="${state.editable?'0':'-1'}" aria-label="Reordenar pasta ${esc(item.title)}. Use as setas para mover." title="Arraste para reorganizar ou use ↑ ↓" aria-disabled="${!state.editable}">⠿</span>
   <button class="folder-item ${f?.id===item.id?'active':''}" data-folder="${esc(item.id)}">
- <div class="folder-card"><span class="collection-folder-index" aria-hidden="true">${String(i+1).padStart(2,'0')}</span>${item.customCoverImageUrl||item.coverImageUrl?`<img class="cover-thumb ${item.tileShape==='POSTER'?'poster':''}" src="${esc(item.customCoverImageUrl||item.coverImageUrl)}" alt="" loading="lazy">`:
+ <div class="folder-card"><span class="collection-folder-index" aria-hidden="true">${String(i+1).padStart(2,'0')}</span>${item.customCoverImageUrl||item.coverImageUrl?`<img class="cover-thumb ${item.tileShape==='POSTER'?'poster':item.tileShape==='PORTRAIT'?'portrait':item.tileShape==='SQUARE'?'square':''}" src="${esc(item.customCoverImageUrl||item.coverImageUrl)}" alt="" loading="lazy">`:
  '<div class="cover-thumb" style="display:grid;place-items:center">▣</div>'}
  <span><strong>${esc(item.title)}</strong><small>${editableSources(item).length} fontes · ${esc(item.tileShape||'LANDSCAPE')}</small></span>
  ${checked&&editableSources(item).some(src=>resolver.resolve(src).status==='missing')?'<span class="collection-folder-warning" title="Catálogos não localizados">!</span>':'<span class="collection-slot-chevron" aria-hidden="true">›</span>'}</div>
@@ -496,7 +499,9 @@ function renderCollections(){
  ${checked&&groupStats?'<p class="panel-sub collection-health-inline">'+groupStats.ready+' reconhecidos · '+groupStats.missing+' não localizados em '+groupStats.folders+' pastas</p>':''}
  <p class="panel-sub">As alterações só serão exportadas depois de salvar.</p>
  <div class="editor-section"><label class="field"><span>Nome da coleção</span>${pen('groupTitle',g.title,'Ex.: Netflix')}</label></div>
- <div class="editor-section"><label class="field"><span>Imagem de fundo (HTTPS)</span>${pen('groupBackdrop',g.backdropImageUrl||'','https://...')}</label></div>
+ <div class="editor-section"><label class="field"><span>Imagem de fundo (HTTPS ou gerada no Hub)</span>${pen('groupBackdrop',g.backdropImageUrl||'','https://...')}</label>
+ <div class="artwork-studio-trigger-row">${makeBtn('✦ Criar capa / ícone (TMDB / IA)','open-artwork-studio','btn btn-primary btn-small',(state.editable?'':'disabled')+' data-target="group"')}</div>
+ ${g.backdropImageUrl?`<div class="art-preview" style="aspect-ratio:16/9"><img src="${esc(g.backdropImageUrl)}" alt="Fundo da coleção"></div>`:''}</div>
  <div class="editor-section"><label class="field"><span>Modo de visualização</span>${select('groupViewMode',[['TABBED_GRID','Grade por abas'],['ROWS','Linhas por pasta'],['FOLLOW_LAYOUT','Seguir layout do Nuvio'],['GRID','Grade (legado)'],['HORIZONTAL','Horizontal (legado)']],g.viewMode||'TABBED_GRID')}</label></div>
  <div class="editor-section"><div class="section-head"><h3>Organizar coleção</h3></div>
  ${makeBtn('Subir ↑','move-group-up','btn btn-small',state.editable?'':'disabled')}
@@ -505,8 +510,9 @@ function renderCollections(){
  else properties=`<div class="panel properties">
  <div class="section-head"><h2>Editar pasta</h2>${makeBtn('Excluir','delete-folder','btn btn-small btn-danger',state.editable?'':'disabled')}</div>
  <div class="editor-section"><label class="field"><span>Nome da pasta</span>${pen('folderTitle',f.title,'Nome da pasta')}</label></div>
- <div class="editor-section"><label class="field"><span>Imagem da capa (HTTPS)</span>${pen('folderCover',f.customCoverImageUrl||f.coverImageUrl||'','https://...imagem.jpg')}</label>
- ${(f.customCoverImageUrl||f.coverImageUrl)?`<div class="art-preview" style="aspect-ratio:${f.tileShape==='POSTER'?'2/3':f.tileShape==='SQUARE'?'1':'16/9'}"><img src="${esc(f.customCoverImageUrl||f.coverImageUrl)}" alt="Capa da pasta"></div>`:''}</div>
+ <div class="editor-section"><label class="field"><span>Imagem da capa (HTTPS ou gerada no Hub)</span>${pen('folderCover',f.customCoverImageUrl||f.coverImageUrl||'','https://...imagem.jpg')}</label>
+ <div class="artwork-studio-trigger-row">${makeBtn('✦ Criar capa / ícone (TMDB / IA)','open-artwork-studio','btn btn-primary btn-small',(state.editable?'':'disabled')+' data-target="folder"')}</div>
+ ${(f.customCoverImageUrl||f.coverImageUrl)?`<div class="art-preview" style="aspect-ratio:${f.tileShape==='POSTER'?'2/3':f.tileShape==='PORTRAIT'?'3/4':f.tileShape==='SQUARE'?'1':'16/9'}"><img src="${esc(f.customCoverImageUrl||f.coverImageUrl)}" alt="Capa da pasta"></div>`:''}</div>
  <div class="editor-section"><label class="field"><span>Proporção para Nuvio Legacy</span>
  ${select('folderShape',[['LANDSCAPE','Landscape · 16:9'],['POSTER','Poster · 2:3'],['SQUARE','Square · 1:1'],['PORTRAIT','Portrait · 3:4 (converte para Poster no Legacy)']],f.tileShape||'LANDSCAPE')}</label></div>
  <div class="editor-section"><div class="section-head"><h3>Catálogos da pasta</h3><span class="badge">${editableSources(f).length}</span></div>
@@ -710,7 +716,7 @@ async function updateSettingsKey(provider,clear=false){
  if(!writable())return;
  const field=$('integration-'+provider);
  if(!clear&&!field?.value.trim())return notify('Informe uma chave para salvar.');
- if(clear&&!confirm('Remover a chave local? Se existir variável de ambiente, ela voltará a ser usada.'))return;
+ if(clear&&!safeConfirm('Remover a chave local? Se existir variável de ambiente, ela voltará a ser usada.'))return;
  const payload={[provider]:clear?{clear:true}:{value:field.value}};
  try{
   await request('/api/hub/settings/integrations',{method:'POST',body:JSON.stringify(payload)});
@@ -744,7 +750,7 @@ async function tmdbCompleteAuthorization(){
 }
 async function saveArtworkErdb(clear=false){
  if(!writable())return;
- if(clear&&!confirm('Desativar o ERDB e remover seu token salvo? Os cartazes voltarão a usar as URLs originais.'))return;
+ if(clear&&!safeConfirm('Desativar o ERDB e remover seu token salvo? Os cartazes voltarão a usar as URLs originais.'))return;
  const payload=clear?{clearToken:true}:{
   enabled:$('erdbEnabled').checked,
   token:$('erdbToken').value.trim(),
@@ -878,9 +884,9 @@ function configureAddon(url){
   const timeoutMs=Math.round(seconds*1000);
   const resources=[...document.querySelectorAll('#modal input[name="addonResource"]:checked')]
    .map(c=>c.value);
-  if(resources.length===0&&!confirm('Nenhum recurso selecionado. O addon não fornecerá conteúdo ao Agregador. Continuar?'))return false;
+  if(resources.length===0&&!safeConfirm('Nenhum recurso selecionado. O addon não fornecerá conteúdo ao Agregador. Continuar?'))return false;
   const missing=resources.filter(r=>hints.length&&!hints.includes(r));
-  if(missing.length&&!confirm('A origem não declarou: '+missing.join(', ')+
+  if(missing.length&&!safeConfirm('A origem não declarou: '+missing.join(', ')+
    '. O addon poderá não responder a esse tipo de consulta. Salvar mesmo assim?'))return false;
   const includeCatalogs=$('addonIncludeCatalogs').checked;
   const response=await request('/api/hub/addons',{method:'POST',
@@ -903,13 +909,13 @@ async function refreshAddonMonitor({renderNow=true,force=false}={}){
 }
 async function addonAction(action,url,enabled){
  if(!writable())return;
- if(action==='remove'&&!confirm('Remover este addon do Agregador? Os outros serão preservados.'))return;
+ if(action==='remove'&&!safeConfirm('Remover este addon do Agregador? Os outros serão preservados.'))return;
  if(action==='toggle'&&enabled===true){
    const addon=(state.profile.addons||[]).find(a=>a.url===url);
    const i=(state.profile.addons||[]).indexOf(addon);
    const status=(state.monitor?.items||[])[i]?.health?.status;
    if(status&&status!=='online'&&
-     !confirm('O addon apresenta status "'+status+'" na origem. Ativá-lo aqui não restaura o serviço externo. Deseja habilitar mesmo assim?'))return;
+     !safeConfirm('O addon apresenta status "'+status+'" na origem. Ativá-lo aqui não restaura o serviço externo. Deseja habilitar mesmo assim?'))return;
  }
  try{
   const result=await request('/api/hub/addons',{method:'POST',body:JSON.stringify({action,url,enabled})});
@@ -918,21 +924,264 @@ async function addonAction(action,url,enabled){
   await refreshAddonMonitor({renderNow:false});render();notify('Lista do Agregador atualizada. O editor usará a mesma configuração.');
  }catch(e){notify(e.message);}
 }
+function validateAddonManifestUrl(rawUrl,existingAddons=state.profile?.addons||[]){
+ const trimmed=String(rawUrl??'').trim();
+ if(!trimmed){
+  return {valid:false,status:'empty',normalizedUrl:'',
+   message:'Informe a URL do manifesto JSON (ex.: https://provedor.exemplo/manifest.json).'};
+ }
+ if(/^http:\/\//i.test(trimmed)){
+  return {valid:false,status:'insecure',normalizedUrl:'',
+   message:'Conexão HTTP insegura não permitida. Use https:// ou stremio://.'};
+ }
+ const schemeMatch=trimmed.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+ if(schemeMatch&&!['https','stremio'].includes(schemeMatch[1].toLowerCase())){
+  return {valid:false,status:'invalid-protocol',normalizedUrl:'',
+   message:'Protocolo não suportado ('+schemeMatch[1]+':). Use https:// ou stremio://.'};
+ }
+ let candidate=trimmed,convertedProtocol=false,addedProtocol=false,appendedManifest=false;
+ if(/^stremio:\/\//i.test(candidate)){
+  candidate='https://'+candidate.slice(10);
+  convertedProtocol=true;
+ }else if(!/^https:\/\//i.test(candidate)){
+  candidate='https://'+candidate.replace(/^\/+/,'');
+  addedProtocol=true;
+ }
+ if(candidate.includes('opensubtitles-v3.strem.fun')){
+  candidate=candidate.replace('opensubtitles-v3.strem.fun','opensubtitles-v3.strem.io');
+  convertedProtocol=true;
+ }
+ let urlObj;
+ try{urlObj=new URL(candidate);}
+ catch{
+  return {valid:false,status:'invalid-url',normalizedUrl:'',
+   message:'Formato de URL inválido. Informe um domínio válido com /manifest.json.'};
+ }
+ const host=(urlObj.hostname||'').toLowerCase().replace(/^\[|\]$/g,'');
+ if(urlObj.protocol!=='https:'||urlObj.username||urlObj.password||!host||(!host.includes('.')&&host!=='localhost'&&!/^\d+\.\d+\.\d+\.\d+$/.test(host)&&!host.includes(':'))){
+  return {valid:false,status:'invalid-url',normalizedUrl:'',
+   message:'Endereço inválido. Verifique o domínio e certifique-se de não incluir credenciais na URL.'};
+ }
+ if(host==='localhost'||host==='0.0.0.0'||host==='::1'||host.endsWith('.local')||
+    /^127\./.test(host)||/^10\./.test(host)||/^192\.168\./.test(host)||
+    /^169\.254\./.test(host)||/^172\.(1[6-9]|2\d|3[0-1])\./.test(host)){
+  return {valid:false,status:'local-host',normalizedUrl:'',
+   message:'Endereços locais ou privados não são permitidos para addons externos.'};
+ }
+ let pathname=urlObj.pathname||'/';
+ if(!/\/manifest\.json$/i.test(pathname)){
+  if(/\.[a-z0-9]{2,5}$/i.test(pathname)){
+   const fileName=pathname.split('/').pop();
+   const isCollections=/^collections\.json$/i.test(fileName);
+   return {valid:false,status:'not-manifest',normalizedUrl:'',
+    message:isCollections
+     ?'Este endereço aponta para um arquivo de coleções (collections.json). Para importar coleções, use a aba Coleções → Importar JSON; para adicionar um addon, informe uma URL terminando em /manifest.json.'
+     :'O endereço aponta para outro arquivo ('+fileName+'). O manifesto deve terminar em /manifest.json.'};
+  }
+  pathname=pathname.replace(/\/+$/,'')+'/manifest.json';
+  appendedManifest=true;
+ }else{
+  pathname=pathname.replace(/\/manifest\.json$/i,'/manifest.json');
+ }
+ const normalizedUrl=urlObj.origin+pathname+(urlObj.search||'');
+ const duplicate=(existingAddons||[]).some(a=>{
+  const itemUrl=typeof a==='string'?a:a?.url;
+  return typeof itemUrl==='string'&&itemUrl.trim().replace(/\/$/,'')===normalizedUrl;
+ });
+ if(duplicate){
+  return {valid:false,status:'duplicate',normalizedUrl,
+   message:'Este addon já está cadastrado no Agregador.'};
+ }
+ const wasNormalized=convertedProtocol||addedProtocol||appendedManifest;
+ return {
+  valid:true,
+  status:wasNormalized?'normalized':'valid',
+  normalizedUrl,
+  hostname:urlObj.hostname,
+  message:wasNormalized
+   ?'Formato válido · endereço ajustado para '+normalizedUrl
+   :'Formato de manifesto válido ('+urlObj.hostname+').'
+ };
+}
+function setAddonUrlFeedbackState(inputEl,feedbackEl,statusClass,message){
+ if(inputEl?.classList){
+  inputEl.classList.remove('is-valid','is-invalid');
+  if(statusClass==='is-valid'){
+   inputEl.classList.add('is-valid');
+   inputEl.setAttribute?.('aria-invalid','false');
+  }else if(statusClass==='is-error'){
+   inputEl.classList.add('is-invalid');
+   inputEl.setAttribute?.('aria-invalid','true');
+  }else{
+   inputEl.removeAttribute?.('aria-invalid');
+  }
+ }
+ if(feedbackEl?.classList){
+  feedbackEl.classList.remove('is-neutral','is-valid','is-warning','is-error');
+  feedbackEl.classList.add(statusClass);
+  feedbackEl.textContent=message;
+ }
+}
+function applyAddonUrlFeedback(inputEl,feedbackEl,rawUrl,existingAddons=state.profile?.addons||[],{normalizeInput=false,showEmptyError=false}={}){
+ const result=validateAddonManifestUrl(rawUrl,existingAddons);
+ if(result.status==='empty'&&!showEmptyError){
+  setAddonUrlFeedbackState(inputEl,feedbackEl,'is-neutral',
+   'Aceita links https://.../manifest.json ou stremio:// (o sufixo /manifest.json é completado automaticamente).');
+ }else if(result.valid){
+  if(normalizeInput&&inputEl&&inputEl.value!==result.normalizedUrl)inputEl.value=result.normalizedUrl;
+  setAddonUrlFeedbackState(inputEl,feedbackEl,'is-valid',result.message);
+ }else{
+  setAddonUrlFeedbackState(inputEl,feedbackEl,'is-error',result.message);
+ }
+ return result;
+}
+function bindAddonUrlLiveValidation({
+ urlInput,
+ nameInput=null,
+ feedbackEl,
+ submitBtn=null,
+ existingAddons=()=>state.profile?.addons||[],
+ validateRemote=async url=>{
+  const res=await request('/api/validate-addon',{method:'POST',body:JSON.stringify({url})});
+  if(!res?.valid&&res?.httpStatus===403&&typeof globalThis.fetch==='function'){
+   try{
+    const direct=await globalThis.fetch(url,{headers:{Accept:'application/json'}});
+    if(direct?.ok){
+     const manifest=await direct.json();
+     if(manifest?.id&&manifest?.name){
+      return await request('/api/validate-addon',{method:'POST',body:JSON.stringify({url,manifest})});
+     }
+    }
+   }catch{}
+  }
+  return res;
+ },
+ debounceMs=500
+}={}){
+ let debounceTimer=null,seq=0,lastValidated=null,lastAutoFilledName='';
+ const setSubmitEnabled=enabled=>{
+  if(!submitBtn)return;
+  submitBtn.disabled=!enabled;
+  if(submitBtn.dataset)submitBtn.dataset.keepDisabled=enabled?'false':'true';
+ };
+ setSubmitEnabled(false);
+ async function runValidation({normalizeInput=false,showEmptyError=false}={}){
+  clearTimeout(debounceTimer);
+  const currentSeq=++seq;
+  const addons=typeof existingAddons==='function'?existingAddons():(existingAddons||[]);
+  const syntax=applyAddonUrlFeedback(urlInput,feedbackEl,urlInput?.value,addons,{normalizeInput,showEmptyError});
+  if(!syntax.valid){
+   lastValidated=null;
+   setSubmitEnabled(false);
+   return {valid:false,syntax,remote:null,error:syntax.message};
+  }
+  if(lastValidated&&lastValidated.normalizedUrl===syntax.normalizedUrl){
+   setAddonUrlFeedbackState(urlInput,feedbackEl,'is-valid',lastValidated.message);
+   setSubmitEnabled(true);
+   return {valid:true,syntax,remote:lastValidated};
+  }
+  lastValidated=null;
+  setSubmitEnabled(false);
+  setAddonUrlFeedbackState(urlInput,feedbackEl,'is-neutral',
+   'Sintaxe válida · verificando acessibilidade de '+syntax.hostname+'...');
+  try{
+   const remote=await validateRemote(syntax.normalizedUrl);
+   if(currentSeq!==seq)return {valid:false,cancelled:true};
+   if(!remote||!remote.valid){
+    const errMsg='Manifesto inacessível ou inválido: '+(remote?.error||'Sem resposta válida da origem.');
+    setAddonUrlFeedbackState(urlInput,feedbackEl,'is-error',errMsg);
+    setSubmitEnabled(false);
+    return {valid:false,syntax,remote,error:errMsg};
+   }
+   const resLabels={stream:'streams',catalog:'catálogos',meta:'metadados',subtitles:'legendas'};
+   const declared=(remote.resources||[]).map(r=>resLabels[r]||r).join(', ')||'recursos verificados';
+   const msg='Manifesto acessível · '+(remote.name||syntax.hostname)+' ('+declared+').';
+   lastValidated={
+    normalizedUrl:syntax.normalizedUrl,
+    name:remote.name||'',
+    resources:remote.resources||[],
+    catalogs:remote.catalogs||[],
+    message:msg
+   };
+   if(nameInput&&remote.name&&(!nameInput.value.trim()||nameInput.value===lastAutoFilledName)){
+    nameInput.value=remote.name;
+    lastAutoFilledName=remote.name;
+   }
+   setAddonUrlFeedbackState(urlInput,feedbackEl,'is-valid',msg);
+   setSubmitEnabled(true);
+   return {valid:true,syntax,remote:lastValidated};
+  }catch(err){
+   if(currentSeq!==seq)return {valid:false,cancelled:true};
+   const errMsg='Falha ao verificar acessibilidade: '+(err?.message||'Erro de conexão.');
+   setAddonUrlFeedbackState(urlInput,feedbackEl,'is-error',errMsg);
+   setSubmitEnabled(false);
+   return {valid:false,syntax,remote:null,error:errMsg};
+  }
+ }
+ if(urlInput?.addEventListener){
+  urlInput.addEventListener('input',()=>{
+   clearTimeout(debounceTimer);
+   seq++;
+   lastValidated=null;
+   setSubmitEnabled(false);
+   const raw=String(urlInput.value??'').trim();
+   if(!raw){
+    const addons=typeof existingAddons==='function'?existingAddons():(existingAddons||[]);
+    applyAddonUrlFeedback(urlInput,feedbackEl,'',addons);
+    return;
+   }
+   setAddonUrlFeedbackState(urlInput,feedbackEl,'is-neutral',
+    'Validando sintaxe e acessibilidade do link...');
+   debounceTimer=setTimeout(()=>{
+    void runValidation({normalizeInput:false});
+   },debounceMs);
+  });
+  urlInput.addEventListener('blur',()=>{
+   clearTimeout(debounceTimer);
+   if(String(urlInput.value??'').trim()){
+    void runValidation({normalizeInput:true});
+   }
+  });
+ }
+ return {
+  runValidation,
+  getLastValidated:()=>lastValidated,
+  cancel:()=>{clearTimeout(debounceTimer);seq++;}
+ };
+}
+globalThis.validateAddonManifestUrl=validateAddonManifestUrl;
+globalThis.NuvioAddonValidator=Object.freeze({
+ validateAddonManifestUrl,
+ applyAddonUrlFeedback,
+ bindAddonUrlLiveValidation
+});
 function addAddon(){
  if(!writable())return;
+ let liveValidator=null;
  showModal('Adicionar addon ao Agregador',`
-  <label class="field"><span>URL do manifesto JSON</span><input id="aUrl" placeholder="https://.../manifest.json"></label>
-  <label class="field"><span>Nome de identificação</span><input id="aName" placeholder="Ex.: Meu provedor"></label>
+  <label class="field"><span>URL do manifesto JSON</span>
+   <input id="aUrl" type="url" autocomplete="off" spellcheck="false" aria-describedby="aUrlFeedback" placeholder="https://.../manifest.json ou stremio://...">
+   <small id="aUrlFeedback" class="addon-url-feedback is-neutral" role="status" aria-live="polite">Aceita links https://.../manifest.json ou stremio:// (o sufixo /manifest.json é completado automaticamente).</small>
+  </label>
+  <label class="field"><span>Nome de identificação</span><input id="aName" placeholder="Preenchido automaticamente pelo manifesto ou digite um nome"></label>
   <div class="inline-info">O mesmo addon aparecerá no Agregador e na biblioteca de fontes para suas coleções.</div>`,async()=>{
-  const url=mandatory('aUrl','a URL do manifesto'),name=mandatory('aName','um nome');
-  if(!/^https:\/\//.test(url))throw Error('Use URL HTTPS.');
-  // validar antes de registrar
-  const test=await request('/api/validate-addon',{method:'POST',body:JSON.stringify({url})});
-  if(!test.valid)throw Error('Manifesto inválido: '+test.error);
-  await request('/api/hub/addons',{method:'POST',body:JSON.stringify({action:'add',url,name,resources:test.resources,catalogs:test.catalogs})});
+  const urlInput=$('aUrl');
+  const check=await liveValidator.runValidation({normalizeInput:true,showEmptyError:true});
+  if(!check.valid){urlInput?.focus();throw Error(check.error||'URL do manifesto inválida.');}
+  const name=mandatory('aName','um nome');
+  const {normalizedUrl:url,resources,catalogs}=check.remote;
+  await request('/api/hub/addons',{method:'POST',body:JSON.stringify({action:'add',url,name,resources,catalogs})});
   state.profile=(await request('/api/profiles/main')).profile.config;
   render();notify('Addon adicionado. Abra Catálogos para identificar seus recursos.');
  },{confirmText:'Adicionar ao Hub'});
+ liveValidator=bindAddonUrlLiveValidation({
+  urlInput:$('aUrl'),
+  nameInput:$('aName'),
+  feedbackEl:$('aUrlFeedback'),
+  submitBtn:$('modalSubmit'),
+  existingAddons:()=>state.profile.addons||[],
+  debounceMs:500
+ });
 }
 // Substituição deliberada: mantém tipo filme/série e nunca altera o JSON importado
 // antes de confirmar o modal e clicar no botão geral Salvar alterações.
@@ -1911,7 +2160,7 @@ async function refreshTraktCatalog(id){
     listId:listSource.listId||null,listVersion:listSource.listVersion||'v4',
     query:listSource.query||'',mode:listSource.mode||'popular',
     filters:listSource.filters||{}})});
-  if(!confirm('Atualizar '+c.name+' com '+result.count+' títulos da origem?'))return;
+  if(!safeConfirm('Atualizar '+c.name+' com '+result.count+' títulos da origem?'))return;
   c.metas=result.metas;c.listSource.updatedAt=new Date().toISOString();
   markDirty();render();
   notify('Lista atualizada. Clique em Salvar alterações para publicar.');
@@ -2132,39 +2381,719 @@ function editCatalog(id){
   catalogs()[i]=newCat;markDirty();render();
  },{confirmText:'Atualizar catálogo'});
 }
+function validateCollectionImportJson(data,kind='collections'){
+ if(!data||typeof data!=='object'){
+  return {
+   valid:false,
+   error:'Estrutura de JSON inválida: esperado um objeto ou lista contendo as chaves obrigatórias (ex.: "name" e "items").'
+  };
+ }
+ const isCollectionItem=item=>Boolean(item&&typeof item==='object'&&!Array.isArray(item)&&
+  (typeof item.name==='string'||typeof item.title==='string'||typeof item.id==='string')&&
+  (Array.isArray(item.items)||Array.isArray(item.folders)));
+ const isCatalogManifest=val=>{
+  if(Array.isArray(val))return val.length>0&&val.every(c=>c&&typeof c==='object'&&!Array.isArray(c.folders)&&!Array.isArray(c.items)&&(typeof c.type==='string'||typeof c.name==='string'));
+  return Boolean(val&&typeof val==='object'&&(Array.isArray(val.catalogs)||Array.isArray(val.manifest?.catalogs)));
+ };
+ if((kind==='catalogs'&&isCatalogManifest(data))||(!isCollectionItem(data)&&!Array.isArray(data)&&!Array.isArray(data.collections)&&!Array.isArray(data.groups)&&isCatalogManifest(data))){
+  const manifestObj=data?.manifest&&typeof data.manifest==='object'?data.manifest:data;
+  const list=Array.isArray(data)?data:manifestObj?.catalogs;
+  if(!Array.isArray(list)||list.length===0){
+   return {valid:false,error:'Estrutura de JSON inválida: a lista "catalogs" está vazia ou ausente.'};
+  }
+  for(let i=0;i<list.length;i++){
+   const c=list[i];
+   if(!c||typeof c!=='object'||!(c.id||typeof c.id==='number')||!['movie','series','anime','other'].includes(c.type)||typeof (c.name||c.title)!=='string'){
+    return {valid:false,error:`Estrutura de JSON inválida no catálogo #${i+1}: chaves obrigatórias "id", "type" e "name" ausentes ou inválidas.`};
+   }
+  }
+  return {valid:true};
+ }
+ let list=null;
+ if(Array.isArray(data)){
+  list=data;
+ }else{
+  const wrapped=data.collections||data.collections_json||data.nuvioCollections||
+   data.data?.collections||data.groups||data.data?.groups;
+  if(Array.isArray(wrapped)){
+   list=wrapped;
+  }else if(Array.isArray(data.items)&&!(typeof data.name==='string'||typeof data.title==='string')&&
+   data.items.length>0&&data.items.every(isCollectionItem)){
+   list=data.items;
+  }else if(typeof data.name==='string'||typeof data.title==='string'||Array.isArray(data.items)||Array.isArray(data.folders)){
+   list=[data];
+  }
+ }
+ if(!Array.isArray(list)||list.length===0){
+  const missing=[];
+  if(!Array.isArray(data)){
+   if(typeof data.name!=='string'&&typeof data.title!=='string')missing.push('"name"');
+   if(!Array.isArray(data.items)&&!Array.isArray(data.folders)&&!Array.isArray(data.collections))missing.push('"items"');
+  }
+  return {
+   valid:false,
+   error:missing.length
+    ?`Estrutura de JSON inválida: o objeto não possui as chaves obrigatórias (${missing.join(', ')}).`
+    :'Estrutura de JSON inválida: nenhuma coleção encontrada. Informe as chaves obrigatórias (ex.: "name" e "items" ou "folders").'
+  };
+ }
+ if(list.length>300){
+  return {valid:false,error:'Estrutura de JSON inválida: o arquivo excede o limite de 300 coleções.'};
+ }
+ for(let i=0;i<list.length;i++){
+  const col=list[i];
+  if(!col||typeof col!=='object'||Array.isArray(col)){
+   return {valid:false,error:`Estrutura de JSON inválida: o item #${i+1} deve ser um objeto de coleção válido.`};
+  }
+  const colName=typeof col.name==='string'?col.name.trim():(typeof col.title==='string'?col.title.trim():'');
+  const hasItems=Array.isArray(col.items)||Array.isArray(col.folders);
+  if(!colName&&!hasItems){
+   return {valid:false,error:`Estrutura de JSON inválida na coleção #${i+1}: chaves obrigatórias "name" e "items" (ou "folders") ausentes.`};
+  }
+  if(!colName){
+   return {valid:false,error:`Estrutura de JSON inválida na coleção #${i+1}: chave obrigatória "name" (ou "title") ausente ou vazia.`};
+  }
+  if(!hasItems){
+   return {valid:false,error:`Estrutura de JSON inválida na coleção "${colName}": chave obrigatória "items" (ou "folders") ausente ou não é uma lista.`};
+  }
+  const entries=col.folders||col.items;
+  for(let j=0;j<entries.length;j++){
+   const entry=entries[j];
+   if(!entry||typeof entry!=='object'||Array.isArray(entry)){
+    return {valid:false,error:`Estrutura de JSON inválida na coleção "${colName}": o item #${j+1} dentro de "items"/"folders" deve ser um objeto.`};
+   }
+   const hasEntryIdentity=Boolean(
+    (typeof entry.name==='string'&&entry.name.trim())||
+    (typeof entry.title==='string'&&entry.title.trim())||
+    entry.catalogId||entry.catalog_id||entry.id||entry.imdb_id||entry.tmdbId
+   );
+   if(!hasEntryIdentity){
+    return {valid:false,error:`Estrutura de JSON inválida na coleção "${colName}": o item #${j+1} não possui as chaves necessárias ("name"/"title" ou "id"/"catalogId").`};
+   }
+  }
+ }
+ return {valid:true};
+}
+globalThis.validateCollectionImportJson=validateCollectionImportJson;
+async function resolveImportPayload(){
+ const mode=$('iMode').value,kind=$('iKind').value;
+ const file=$('iFile').files?.[0];
+ let raw=($('iRaw').value||'').replace(/^\uFEFF/,'').trim();
+ let url=($('iUrl').value||'').trim();
+ if(!url&&/^https:\/\/\S+$/i.test(raw)){url=raw;raw='';}
+ if(/^stremio:\/\//i.test(url))url='https://'+url.slice(10);
+ let value;
+ if(mode==='new'&&!file&&!raw&&!url)return {mode,[kind]:null};
+ if(file){
+  if(file.size>10e6)throw Error('Arquivo excede 10 MB.');
+  const text=(await file.text()).replace(/^\uFEFF/,'').trim();
+  try{value=JSON.parse(text);}
+  catch{throw Error('Arquivo JSON inválido: verifique a sintaxe do arquivo selecionado.');}
+ }else if(raw){
+  try{value=JSON.parse(raw);}
+  catch{throw Error('Conteúdo JSON inválido: verifique se o texto colado está completo.');}
+ }else if(url){
+  if(!url.startsWith('https://'))throw Error('Use URL HTTPS.');
+  try{
+   const r=await fetch(url,{cache:'no-store',credentials:'omit'});
+   if(!r.ok)throw Error('HTTP '+r.status);
+   value=JSON.parse((await r.text()).replace(/^\uFEFF/,'').trim());
+  }catch{
+   const proxied=await request('/api/nuvio-studio/fetch-json',{method:'POST',body:JSON.stringify({url})});
+   value=proxied.data;
+  }
+ }else throw Error('Forneça JSON, arquivo ou endereço.');
+ const checkStruct=validateCollectionImportJson(value,kind);
+ if(!checkStruct.valid)throw Error(checkStruct.error);
+ return {mode,[kind]:value};
+}
 function openImport(){
  if(!writable())return;
  showModal('Importar JSON de coleções ou catálogos',`
  <div class="inline-info">Cole JSON de qualquer fornecedor compatível com o formato Nuvio, ou selecione um arquivo. Você escolhe acrescentar ou substituir. Não há conexão automática com nenhuma fonte.</div>
  <label class="field"><span>O que importar?</span><select id="iKind"><option value="collections">Coleções do Nuvio</option><option value="catalogs">Manifesto / catálogos</option></select></label>
  <label class="field"><span>Como aplicar?</span><select id="iMode"><option value="append">Acrescentar, preservando as atuais</option><option value="replace">Substituir importados (com backup)</option><option value="new">Começar uma nova biblioteca vazia</option></select></label>
- <label class="field"><span>Colar JSON</span>${textarea('iRaw','',10)}</label>
- <label class="field"><span>Ou selecionar arquivo .json</span><input id="iFile" type="file" accept=".json,application/json"></label>
+ <label class="field"><span>Selecionar arquivo .json</span><input id="iFile" type="file" accept=".json,application/json"></label>
+ <label class="field"><span>Ou colar JSON</span>${textarea('iRaw','',8)}</label>
  <label class="field"><span>Ou colar endereço HTTPS do JSON</span><input id="iUrl" placeholder="https://.../collections.json"></label>
- <small class="muted">Fonte sem permissão CORS? Baixe o JSON e selecione o arquivo.</small>`,
+ <small id="iPreviewFeedback" class="addon-url-feedback is-neutral" role="status" aria-live="polite">Selecione um arquivo .json, cole o conteúdo JSON ou informe um endereço HTTPS para validar e importar.</small>`,
  async()=>{
-  const mode=$('iMode').value,kind=$('iKind').value;
-  const file=$('iFile').files?.[0],raw=$('iRaw').value.trim(),url=$('iUrl').value.trim();
-  let value;
-  if(mode==='new'&&!file&&!raw&&!url)value=null;
-  else if(file){if(file.size>10e6)throw Error('Arquivo excede 10 MB.');value=JSON.parse(await file.text());}
-  else if(raw)value=JSON.parse(raw);
-  else if(url){
-   if(!url.startsWith('https://'))throw Error('Use URL HTTPS.');
-   const r=await fetch(url,{cache:'no-store',credentials:'omit'});
-   if(!r.ok)throw Error('A URL retornou '+r.status);
-   value=await r.json();
-  }else throw Error('Forneça JSON, arquivo ou endereço.');
-  const payload={mode,[kind]:value};
-  const check=await request('/api/nuvio-studio/workspace/preview',{method:'POST',body:JSON.stringify(payload)});
-  if(!confirm(`Pré-visualização: ${check.stats.groups} coleções, ${check.stats.folders} pastas e ${check.stats.catalogs} catálogos no resultado.\n\nConfirmar importação?`))return false;
-  const saved=await request('/api/nuvio-studio/workspace/apply',{method:'POST',
-    body:JSON.stringify({...payload,expectedRevision:check.expectedRevision})});
-  const work=await request('/api/hub/workspace');
-  state.workspace=work;state.dirty=false;state.selectedGroup=groups()[0]?.id||null;state.selectedFolder=null;
-  render();notify('Importação concluída, sem token e sem consultar outra fonte automaticamente.');
-  return true;
- },{confirmText:'Pré-visualizar e importar'});
+  const feedback=$('iPreviewFeedback');
+  try{
+   const payload=await resolveImportPayload();
+   const check=await request('/api/nuvio-studio/workspace/preview',{method:'POST',body:JSON.stringify(payload)});
+   if(feedback){
+    setAddonUrlFeedbackState(null,feedback,'is-valid',
+     `Aplicando importação: ${check.stats.groups} coleções, ${check.stats.folders} pastas e ${check.stats.catalogs} catálogos...`);
+   }
+   await request('/api/nuvio-studio/workspace/apply',{method:'POST',
+     body:JSON.stringify({...payload,expectedRevision:check.expectedRevision})});
+   const work=await request('/api/hub/workspace');
+   state.workspace=work;state.dirty=false;state.selectedGroup=groups()[0]?.id||null;state.selectedFolder=null;
+   state.collectionInventory='idle';
+   void refreshCollectionInventory(true);
+   render();
+   notify(`Importação concluída: ${check.stats.groups} coleções, ${check.stats.folders} pastas e ${check.stats.catalogs} catálogos na biblioteca.`);
+   return true;
+  }catch(err){
+   if(feedback)setAddonUrlFeedbackState(null,feedback,'is-error',err.message||'Estrutura de JSON inválida.');
+   throw err;
+  }
+ },{confirmText:'Importar JSON'});
+ let previewTimer=null;
+ const runPreviewCheck=async({toastOnError=false}={})=>{
+  const feedback=$('iPreviewFeedback');
+  if(!feedback)return;
+  const hasFile=!!$('iFile')?.files?.length;
+  const hasRaw=!!$('iRaw')?.value.trim();
+  const hasUrl=!!$('iUrl')?.value.trim();
+  const mode=$('iMode')?.value;
+  if(!hasFile&&!hasRaw&&!hasUrl&&mode!=='new'){
+   setAddonUrlFeedbackState(null,feedback,'is-neutral',
+    'Selecione um arquivo .json, cole o conteúdo JSON ou informe um endereço HTTPS para validar e importar.');
+   return;
+  }
+  setAddonUrlFeedbackState(null,feedback,'is-neutral','Validando estrutura do JSON...');
+  try{
+   const payload=await resolveImportPayload();
+   const check=await request('/api/nuvio-studio/workspace/preview',{method:'POST',body:JSON.stringify(payload)});
+   setAddonUrlFeedbackState(null,feedback,'is-valid',
+    `Pré-visualização pronta: ${check.stats.groups} coleções, ${check.stats.folders} pastas e ${check.stats.catalogs} catálogos no resultado.`);
+  }catch(err){
+   const msg=err.message||'JSON inválido.';
+   setAddonUrlFeedbackState(null,feedback,'is-error',msg);
+   if(toastOnError)notify(msg);
+  }
+ };
+ $('iFile')?.addEventListener('change',()=>{void runPreviewCheck({toastOnError:true});});
+ $('iKind')?.addEventListener('change',()=>{void runPreviewCheck();});
+ $('iMode')?.addEventListener('change',()=>{void runPreviewCheck();});
+ for(const id of ['iRaw','iUrl']){
+  $(id)?.addEventListener('input',()=>{
+   clearTimeout(previewTimer);
+   previewTimer=setTimeout(()=>{void runPreviewCheck();},350);
+  });
+ }
+}
+
+const ARTWORK_SHAPE_MAP=Object.freeze({
+ '16:9':'LANDSCAPE',
+ '16:9 HD':'BACKDROP',
+ '2:3':'POSTER',
+ '3:4':'PORTRAIT',
+ '1:1':'SQUARE',
+ LANDSCAPE:'LANDSCAPE',
+ POSTER:'POSTER',
+ PORTRAIT:'PORTRAIT',
+ SQUARE:'SQUARE',
+ BACKDROP:'BACKDROP'
+});
+const SHAPE_TO_TILE_SHAPE=Object.freeze({
+ LANDSCAPE:'LANDSCAPE',
+ POSTER:'POSTER',
+ PORTRAIT:'PORTRAIT',
+ SQUARE:'SQUARE',
+ BACKDROP:'LANDSCAPE'
+});
+const TILE_SHAPE_TO_RATIO=Object.freeze({
+ LANDSCAPE:'16:9',
+ POSTER:'2:3',
+ PORTRAIT:'3:4',
+ SQUARE:'1:1'
+});
+function normalizeStudioShape(val,fallback='LANDSCAPE'){
+ return ARTWORK_SHAPE_MAP[String(val||'').trim().toUpperCase()]||fallback;
+}
+function normalizeTileShape(val,fallback='LANDSCAPE'){
+ const shape=normalizeStudioShape(val,fallback);
+ return SHAPE_TO_TILE_SHAPE[shape]||'LANDSCAPE';
+}
+function tileShapeCssAspectRatio(val){
+ const s=normalizeTileShape(val);
+ return s==='POSTER'?'2/3':s==='PORTRAIT'?'3/4':s==='SQUARE'?'1/1':'16/9';
+}
+function applyTargetTileShape(targetObj,rawShape,{isGroup=false}={}){
+ if(!targetObj)return 'LANDSCAPE';
+ const normalizedShape=normalizeStudioShape(rawShape,isGroup?'BACKDROP':'LANDSCAPE');
+ const tileShape=normalizeTileShape(normalizedShape);
+ targetObj.tileShape=tileShape;
+ if(isGroup){
+  targetObj.artworkShape=normalizedShape;
+  for(const item of targetObj.folders||[]){
+   if(!item.tileShape)item.tileShape=tileShape;
+  }
+ }
+ return tileShape;
+}
+globalThis.ArtworkStudioShapeBinding={
+ normalizeStudioShape,
+ normalizeTileShape,
+ tileShapeCssAspectRatio,
+ applyTargetTileShape,
+ TILE_SHAPE_TO_RATIO
+};
+
+async function openArtworkStudio(targetKind='folder'){
+ if(!writable())return;
+ const g=group(),f=folder();
+ const isGroup=targetKind==='group'||!f;
+ if(!g)return notify('Selecione uma coleção primeiro.');
+ const targetObj=isGroup?g:f;
+ const initialTileShape=normalizeTileShape(isGroup?(g.tileShape||'LANDSCAPE'):(f.tileShape||g.tileShape||'LANDSCAPE'));
+ const initialShape=isGroup?normalizeStudioShape(g.artworkShape||g.tileShape||'LANDSCAPE','LANDSCAPE'):initialTileShape;
+ const initialTitle=String(targetObj?.title||'').trim();
+ const initialSub=isGroup?((g.folders?.length||0)+' PASTAS'):(g.title||'');
+
+ let presetsData={shapes:{},presets:[]};
+ try{presetsData=await request('/api/hub/artwork/studio-presets');}catch{}
+ const presets=presetsData.presets||[];
+
+ const studioState={
+  targetKind:isGroup?'group':'folder',
+  targetId:targetObj.id,
+  mode:'mosaic',
+  shape:initialShape,
+  tileShape:initialTileShape,
+  ratio:TILE_SHAPE_TO_RATIO[initialTileShape]||'16:9',
+  layout:'triptych',
+  useBackdrop:initialShape==='LANDSCAPE'||initialShape==='BACKDROP',
+  title:initialTitle,
+  subtitle:initialSub.toUpperCase(),
+  badge:'',
+  presetId:presets[0]?.id||'netflix',
+  primary:'#E50914',
+  secondary:'#090D16',
+  accent:'#38BDF8',
+  pattern:'glow',
+  hideTitle:Boolean(!isGroup&&f?.hideTitle),
+  aiPrompt:`Arte cinematográfica escura para ${initialTitle||'a coleção'}, iluminação dramática de estúdio, sem texto`,
+  aiStyle:'cinema',
+  tmdbQuery:'',
+  candidates:[],
+  selectedImages:[],
+  previewDataUrl:'',
+  savedResult:null,
+  busy:false
+ };
+
+ const matchedPreset=presets.find(p=>initialTitle.toLowerCase().includes(p.name.toLowerCase())||initialTitle.toLowerCase().includes(p.id));
+ if(matchedPreset){
+  studioState.presetId=matchedPreset.id;
+  studioState.primary=matchedPreset.primary;
+  studioState.secondary=matchedPreset.secondary;
+  studioState.accent=matchedPreset.accent;
+  studioState.badge=matchedPreset.badge;
+ }
+
+ const shapeOptions=[
+  {shape:'LANDSCAPE',tileShape:'LANDSCAPE',ratio:'16:9',label:'Landscape · 16:9 (1280×720)'},
+  {shape:'POSTER',tileShape:'POSTER',ratio:'2:3',label:'Poster · 2:3 (600×900)'},
+  {shape:'PORTRAIT',tileShape:'PORTRAIT',ratio:'3:4',label:'Portrait · 3:4 (750×1000)'},
+  {shape:'SQUARE',tileShape:'SQUARE',ratio:'1:1',label:'Square / Ícone · 1:1 (800×800)'},
+  {shape:'BACKDROP',tileShape:'LANDSCAPE',ratio:'16:9 HD',label:'Backdrop Coleção · 16:9 HD (1920×1080)'}
+ ];
+ const currentShapeOption=shapeOptions.find(o=>o.shape===studioState.shape)||shapeOptions[0];
+
+ showModal(
+  `Estúdio de Capas e Ícones · ${isGroup?'Coleção: '+g.title:'Pasta: '+f.title}`,
+  `<div class="artwork-studio-modal">
+   <div class="artwork-studio-top-bar">
+    <div class="artwork-studio-modes" role="tablist" aria-label="Modo de criação">
+     <button type="button" class="artwork-mode-tab active" data-art-mode="mosaic">1. Mosaico & Arte TMDB</button>
+     <button type="button" class="artwork-mode-tab" data-art-mode="preset">2. Logos & Temas Prontos</button>
+     <button type="button" class="artwork-mode-tab" data-art-mode="ai">3. Gerar com IA</button>
+    </div>
+    <div class="artwork-studio-shape-bar" role="group" aria-label="Proporção e tamanho da capa">
+     ${shapeOptions.map(opt=>`<button type="button" class="artwork-shape-pill ${studioState.shape===opt.shape?'active':''}" data-art-shape="${opt.shape}" data-tile-shape="${opt.tileShape}" data-art-ratio="${opt.ratio}" aria-pressed="${studioState.shape===opt.shape}">${esc(opt.label)}</button>`).join('')}
+    </div>
+   </div>
+
+   <div class="artwork-studio-grid">
+    <div class="artwork-studio-controls">
+     <div id="artPaneMosaic" class="artwork-pane">
+      <div class="artwork-search-row">
+       <input id="artTmdbSearch" class="search" placeholder="Pesquisar filme ou série no TMDB (ex.: Duna, Batman, Stranger Things)...">
+       <button type="button" class="btn btn-subtle btn-small" id="artTmdbSearchBtn">Buscar TMDB</button>
+      </div>
+      <div class="artwork-inline-options">
+       <label class="field"><span>Layout do Mosaico</span>
+        <select id="artMosaicLayout">
+         <option value="triptych">Tríptico · 3 Títulos</option>
+         <option value="grid2x2">Mosaico 2×2 · 4 Títulos</option>
+         <option value="dual">Dupla · 2 Títulos</option>
+         <option value="single">Arte Única em Destaque</option>
+        </select>
+       </label>
+       <label class="field"><span>Tipo de Imagem TMDB</span>
+        <select id="artImageSourceKind">
+         <option value="backdrop" ${studioState.useBackdrop?'selected':''}>Backdrops horizontais (16:9)</option>
+         <option value="poster" ${!studioState.useBackdrop?'selected':''}>Pôsteres verticais (2:3)</option>
+        </select>
+       </label>
+      </div>
+      <p class="muted" style="margin:4px 0 8px">Clique nos títulos abaixo para selecionar até 4 artes para compor sua capa:</p>
+      <div id="artTmdbGrid" class="artwork-candidates-grid"></div>
+     </div>
+
+     <div id="artPanePreset" class="artwork-pane" hidden>
+      <p class="muted" style="margin:0 0 8px">Escolha um tema oficial de streaming ou gênero cinematográfico (adapta-se automaticamente a 16:9, 2:3, 3:4 e 1:1):</p>
+      <div class="artwork-presets-grid">
+       ${presets.map(p=>`<button type="button" class="artwork-preset-card ${studioState.presetId===p.id?'active':''}" data-art-preset="${esc(p.id)}" style="--preset-color:${esc(p.primary)}">
+        <span class="artwork-preset-badge" style="background:${esc(p.primary)}">${esc(p.badge)}</span>
+        <span><strong>${esc(p.name)}</strong><small>${esc(p.category==='streaming'?'Streaming':'Gênero / Tema')}</small></span>
+       </button>`).join('')}
+      </div>
+      <div class="artwork-inline-options" style="margin-top:12px">
+       <label class="field"><span>Cor Principal</span><input type="color" id="artColorPrimary" value="${esc(studioState.primary)}"></label>
+       <label class="field"><span>Cor de Destaque</span><input type="color" id="artColorAccent" value="${esc(studioState.accent)}"></label>
+       <label class="field"><span>Textura de Fundo</span>
+        <select id="artPattern">
+         <option value="glow">Brilho Radial</option>
+         <option value="rays">Feixes de Cinema</option>
+         <option value="rings">Anéis Concêntricos</option>
+         <option value="grid">Grade Studio</option>
+        </select>
+       </label>
+      </div>
+     </div>
+
+     <div id="artPaneAi" class="artwork-pane" hidden>
+      <label class="field"><span>Descreva a capa ou ícone que deseja criar com IA</span>
+       <textarea id="artAiPrompt" rows="3" placeholder="Ex.: Sala de cinema futurista neon com atmosfera de suspense...">${esc(studioState.aiPrompt)}</textarea>
+      </label>
+      <div class="artwork-inline-options">
+       <label class="field"><span>Estilo Visual da IA</span>
+        <select id="artAiStyle">
+         <option value="cinema">Cinema Dark & Atmosférico</option>
+         <option value="neon">Cyberpunk & Neon Sci-Fi</option>
+         <option value="minimal">Minimalista 3D & Ícone</option>
+         <option value="epic">Arte Conceitual Épica</option>
+         <option value="noir">Editorial Noir Clássico</option>
+         <option value="anime">Anime & Ilustração Vibrante</option>
+        </select>
+       </label>
+       <div style="display:flex;align-items:end">
+        <button type="button" class="btn btn-primary" id="artGenerateAiBtn">✦ Gerar Arte com IA</button>
+       </div>
+      </div>
+      <p class="muted" style="margin-top:8px">A IA gera a arte já na proporção selecionada acima (16:9, 2:3, 3:4 ou 1:1) e aplica a tipografia da coleção/pasta.</p>
+     </div>
+
+     <div class="artwork-typography-box">
+      <div class="artwork-inline-options">
+       <label class="field"><span>Título exibido na capa</span><input id="artTitleInput" class="search" value="${esc(studioState.title)}" placeholder="Ex.: NETFLIX"></label>
+       <label class="field"><span>Subtítulo / Selo superior</span><input id="artSubtitleInput" class="search" value="${esc(studioState.subtitle)}" placeholder="Ex.: ORIGINAIS & CATÁLOGO"></label>
+       <label class="field"><span>Ícone / Sigla central</span><input id="artBadgeInput" class="search" value="${esc(studioState.badge)}" placeholder="Ex.: N, 4K, ✦"></label>
+      </div>
+      <label class="addon-resource-choice" style="margin-top:8px">
+       <input type="checkbox" id="artHideTitleCheck" ${studioState.hideTitle?'checked':''}>
+       <span><b>Ocultar texto na capa (exibir somente arte / ícone central)</b></span>
+      </label>
+     </div>
+    </div>
+
+    <div class="artwork-studio-preview-col">
+     <div class="artwork-preview-header">
+      <span class="nuvio-preview-overline">PRÉ-VISUALIZAÇÃO EM TEMPO REAL</span>
+      <strong id="artShapeSummary">${esc(currentShapeOption.label)}</strong>
+     </div>
+     <div id="artPreviewStage" class="artwork-preview-stage shape-${esc(studioState.shape.toLowerCase())}" style="aspect-ratio:${tileShapeCssAspectRatio(studioState.tileShape)}" data-tile-shape="${esc(studioState.tileShape)}" data-art-ratio="${esc(studioState.ratio)}">
+      <img id="artPreviewImage" alt="Pré-visualização da capa gerada" hidden>
+      <div id="artPreviewPlaceholder" class="artwork-preview-loading">Gerando pré-visualização...</div>
+     </div>
+     <small id="artStudioStatus" class="addon-url-feedback is-neutral" role="status" aria-live="polite">A imagem e a proporção (${esc(studioState.tileShape)} · ${esc(studioState.ratio)}) serão vinculadas automaticamente.</small>
+    </div>
+   </div>
+  </div>`,
+  async()=>{
+   const statusEl=$('artStudioStatus');
+   if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-neutral','Salvando capa localmente no Hub...');
+   let finalSaved=studioState.savedResult;
+   if(!finalSaved){
+    if(studioState.mode==='ai'){
+     finalSaved=await request('/api/hub/artwork/generate-ai',{
+      method:'POST',
+      body:JSON.stringify({
+       prompt:studioState.aiPrompt,
+       title:studioState.title,
+       subtitle:studioState.subtitle,
+       badge:studioState.badge,
+       style:studioState.aiStyle,
+       shape:studioState.shape,
+       hideTitle:studioState.hideTitle,
+       images:studioState.selectedImages,
+       save:true
+      })
+     });
+    }else{
+     finalSaved=await request('/api/hub/artwork/compose',{
+      method:'POST',
+      body:JSON.stringify({
+       mode:studioState.mode,
+       shape:studioState.shape,
+       layout:studioState.layout,
+       title:studioState.title,
+       subtitle:studioState.subtitle,
+       badge:studioState.badge,
+       presetId:studioState.presetId,
+       primary:studioState.primary,
+       secondary:studioState.secondary,
+       accent:studioState.accent,
+       hideTitle:studioState.hideTitle,
+       pattern:studioState.pattern,
+       images:studioState.selectedImages,
+       save:true
+      })
+     });
+    }
+   }
+   if(!finalSaved?.url)throw Error('Não foi possível salvar a capa gerada.');
+   const appliedTileShape=applyTargetTileShape(
+    targetObj,
+    finalSaved.tileShape||studioState.tileShape||studioState.shape,
+    {isGroup}
+   );
+   if(isGroup){
+    g.backdropImageUrl=finalSaved.url;
+    g.coverImageUrl=finalSaved.url;
+   }else if(f){
+    f.coverImageUrl=finalSaved.url;
+    f.customCoverImageUrl=finalSaved.url;
+    f.tileShape=appliedTileShape;
+    f.hideTitle=studioState.hideTitle;
+   }
+   markDirty();
+   render();
+   notify(`Capa ${finalSaved.shape} (${appliedTileShape}) salva localmente no Hub e vinculada com sucesso!`);
+   return true;
+  },
+  {confirmText:isGroup?'Salvar e aplicar na coleção':'Salvar e aplicar na pasta'}
+ );
+
+ document.querySelector('#modal .modal')?.classList.add('catalog-builder-modal');
+
+ let composeTimer=null;
+ const updateShapeStageClass=()=>{
+  const stage=$('artPreviewStage');
+  const summary=$('artShapeSummary');
+  if(!stage)return;
+  stage.className='artwork-preview-stage shape-'+studioState.shape.toLowerCase();
+  stage.style.aspectRatio=tileShapeCssAspectRatio(studioState.tileShape);
+  stage.dataset.tileShape=studioState.tileShape;
+  stage.dataset.artRatio=studioState.ratio;
+  const labelMap={
+   LANDSCAPE:'Landscape · 16:9 (1280×720)',
+   POSTER:'Poster · 2:3 (600×900)',
+   PORTRAIT:'Portrait · 3:4 (750×1000)',
+   SQUARE:'Square / Ícone · 1:1 (800×800)',
+   BACKDROP:'Backdrop Coleção · 16:9 HD (1920×1080)'
+  };
+  if(summary)summary.textContent=labelMap[studioState.shape]||studioState.shape;
+ };
+
+ const refreshComposePreview=async({isAi=false}={})=>{
+  studioState.savedResult=null;
+  updateShapeStageClass();
+  const imgEl=$('artPreviewImage');
+  const placeholder=$('artPreviewPlaceholder');
+  const statusEl=$('artStudioStatus');
+  if(placeholder){placeholder.hidden=false;placeholder.textContent=isAi?'Gerando arte com IA...':'Renderizando capa em alta definição...';}
+  try{
+   const endpoint=isAi?'/api/hub/artwork/generate-ai':'/api/hub/artwork/compose';
+   const payload=isAi?{
+    prompt:studioState.aiPrompt,
+    title:studioState.title,
+    subtitle:studioState.subtitle,
+    badge:studioState.badge,
+    style:studioState.aiStyle,
+    shape:studioState.shape,
+    hideTitle:studioState.hideTitle,
+    images:studioState.selectedImages,
+    save:false
+   }:{
+    mode:studioState.mode,
+    shape:studioState.shape,
+    layout:studioState.layout,
+    title:studioState.title,
+    subtitle:studioState.subtitle,
+    badge:studioState.badge,
+    presetId:studioState.presetId,
+    primary:studioState.primary,
+    secondary:studioState.secondary,
+    accent:studioState.accent,
+    hideTitle:studioState.hideTitle,
+    pattern:studioState.pattern,
+    images:studioState.selectedImages,
+    save:false
+   };
+   const res=await request(endpoint,{method:'POST',body:JSON.stringify(payload)});
+   if(res?.dataUrl&&imgEl){
+    imgEl.src=res.dataUrl;
+    imgEl.hidden=false;
+    if(placeholder)placeholder.hidden=true;
+    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-valid',`Prévia pronta em ${res.width}×${res.height}px (${res.shape}). Clique em Salvar e aplicar para vincular.`);
+   }
+  }catch(err){
+   if(placeholder){placeholder.hidden=false;placeholder.textContent='Erro ao renderizar prévia.';}
+   if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-error',err.message||'Falha ao compor prévia.');
+  }
+ };
+
+ const scheduleCompose=()=>{
+  clearTimeout(composeTimer);
+  composeTimer=setTimeout(()=>{void refreshComposePreview({isAi:false});},220);
+ };
+
+ const renderTmdbCandidatesGrid=()=>{
+  const grid=$('artTmdbGrid');
+  if(!grid)return;
+  if(!studioState.candidates.length){
+   grid.innerHTML='<div class="empty">Nenhum título encontrado. Tente outra busca.</div>';
+   return;
+  }
+  grid.innerHTML=studioState.candidates.map((item,idx)=>{
+   const chosenUrl=studioState.useBackdrop?(item.backdrop||item.poster):(item.poster||item.backdrop);
+   const selIndex=studioState.selectedImages.indexOf(chosenUrl);
+   return `<button type="button" class="artwork-candidate-card ${selIndex>=0?'selected':''}" data-art-candidate="${idx}">
+    <img src="${esc(chosenUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">
+    ${selIndex>=0?`<span class="artwork-candidate-order">${selIndex+1}</span>`:''}
+    <span class="artwork-candidate-title">${esc(item.name)}${item.year?' ('+esc(item.year)+')':''}</span>
+   </button>`;
+  }).join('');
+ };
+
+ const loadTmdbCandidates=async(query='')=>{
+  const grid=$('artTmdbGrid');
+  if(grid)grid.innerHTML='<div class="empty">Consultando artes do TMDB e dos catálogos...</div>';
+  try{
+   const folderSources=!isGroup&&f?editableSources(f):(g.folders||[]).flatMap(fl=>editableSources(fl));
+   const res=await request('/api/hub/artwork/tmdb-candidates',{
+    method:'POST',
+    body:JSON.stringify({query,sources:folderSources})
+   });
+   studioState.candidates=res.items||[];
+   if(!studioState.selectedImages.length&&studioState.candidates.length){
+    studioState.selectedImages=studioState.candidates.slice(0,4).map(it=>studioState.useBackdrop?(it.backdrop||it.poster):(it.poster||it.backdrop)).filter(Boolean);
+   }
+   renderTmdbCandidatesGrid();
+   void refreshComposePreview({isAi:false});
+  }catch(err){
+   if(grid)grid.innerHTML=`<div class="empty">${esc(err.message)}</div>`;
+  }
+ };
+
+ const modalRoot=$('modalContent');
+ modalRoot.addEventListener('click',e=>{
+  const modeBtn=e.target.closest('[data-art-mode]');
+  if(modeBtn){
+   studioState.mode=modeBtn.dataset.artMode;
+   modalRoot.querySelectorAll('[data-art-mode]').forEach(b=>b.classList.toggle('active',b===modeBtn));
+   $('artPaneMosaic').hidden=studioState.mode!=='mosaic';
+   $('artPanePreset').hidden=studioState.mode!=='preset';
+   $('artPaneAi').hidden=studioState.mode!=='ai';
+   void refreshComposePreview({isAi:studioState.mode==='ai'});
+   return;
+  }
+  const shapeBtn=e.target.closest('[data-art-shape],[data-art-ratio]');
+  if(shapeBtn){
+   const chosenShape=normalizeStudioShape(shapeBtn.dataset.artShape||shapeBtn.dataset.artRatio,studioState.shape);
+   const chosenTileShape=normalizeTileShape(shapeBtn.dataset.tileShape||chosenShape);
+   studioState.shape=chosenShape;
+   studioState.tileShape=chosenTileShape;
+   studioState.ratio=TILE_SHAPE_TO_RATIO[chosenTileShape]||'16:9';
+   studioState.useBackdrop=chosenShape==='LANDSCAPE'||chosenShape==='BACKDROP';
+   if($('artImageSourceKind'))$('artImageSourceKind').value=studioState.useBackdrop?'backdrop':'poster';
+   if(studioState.candidates.length){
+    studioState.selectedImages=studioState.candidates.slice(0,4).map(it=>studioState.useBackdrop?(it.backdrop||it.poster):(it.poster||it.backdrop)).filter(Boolean);
+    renderTmdbCandidatesGrid();
+   }
+   applyTargetTileShape(targetObj,chosenShape,{isGroup});
+   markDirty();
+   render();
+   modalRoot.querySelectorAll('[data-art-shape]').forEach(b=>{
+    const isSelected=b.dataset.artShape===studioState.shape;
+    b.classList.toggle('active',isSelected);
+    b.setAttribute('aria-pressed',String(isSelected));
+   });
+   updateShapeStageClass();
+   void refreshComposePreview({isAi:studioState.mode==='ai'});
+   return;
+  }
+  const presetBtn=e.target.closest('[data-art-preset]');
+  if(presetBtn){
+   const p=presets.find(x=>x.id===presetBtn.dataset.artPreset);
+   if(!p)return;
+   studioState.presetId=p.id;
+   studioState.primary=p.primary;
+   studioState.secondary=p.secondary;
+   studioState.accent=p.accent;
+   studioState.badge=p.badge;
+   if($('artColorPrimary'))$('artColorPrimary').value=p.primary;
+   if($('artColorAccent'))$('artColorAccent').value=p.accent;
+   if($('artBadgeInput'))$('artBadgeInput').value=p.badge;
+   if($('artSubtitleInput'))$('artSubtitleInput').value=p.subtitle;
+   modalRoot.querySelectorAll('[data-art-preset]').forEach(b=>b.classList.toggle('active',b===presetBtn));
+   void refreshComposePreview({isAi:false});
+   return;
+  }
+  const candBtn=e.target.closest('[data-art-candidate]');
+  if(candBtn){
+   const item=studioState.candidates[Number(candBtn.dataset.artCandidate)];
+   if(!item)return;
+   const chosenUrl=studioState.useBackdrop?(item.backdrop||item.poster):(item.poster||item.backdrop);
+   const idx=studioState.selectedImages.indexOf(chosenUrl);
+   if(idx>=0){
+    studioState.selectedImages.splice(idx,1);
+   }else{
+    if(studioState.selectedImages.length>=4)studioState.selectedImages.shift();
+    studioState.selectedImages.push(chosenUrl);
+   }
+   renderTmdbCandidatesGrid();
+   void refreshComposePreview({isAi:false});
+   return;
+  }
+  if(e.target.id==='artTmdbSearchBtn'){
+   void loadTmdbCandidates($('artTmdbSearch')?.value||'');
+   return;
+  }
+  if(e.target.id==='artGenerateAiBtn'){
+   studioState.aiPrompt=$('artAiPrompt')?.value||studioState.aiPrompt;
+   studioState.aiStyle=$('artAiStyle')?.value||studioState.aiStyle;
+   void refreshComposePreview({isAi:true});
+  }
+ });
+
+ modalRoot.addEventListener('change',e=>{
+  const id=e.target.id;
+  if(id==='artMosaicLayout'){studioState.layout=e.target.value;void refreshComposePreview();}
+  else if(id==='artImageSourceKind'){
+   studioState.useBackdrop=e.target.value==='backdrop';
+   studioState.selectedImages=studioState.candidates.slice(0,4).map(it=>studioState.useBackdrop?(it.backdrop||it.poster):(it.poster||it.backdrop)).filter(Boolean);
+   renderTmdbCandidatesGrid();
+   void refreshComposePreview();
+  }else if(id==='artColorPrimary'){studioState.primary=e.target.value;scheduleCompose();}
+  else if(id==='artColorAccent'){studioState.accent=e.target.value;scheduleCompose();}
+  else if(id==='artPattern'){studioState.pattern=e.target.value;void refreshComposePreview();}
+  else if(id==='artAiStyle'){studioState.aiStyle=e.target.value;void refreshComposePreview({isAi:true});}
+  else if(id==='artHideTitleCheck'){studioState.hideTitle=e.target.checked;void refreshComposePreview({isAi:studioState.mode==='ai'});}
+ });
+
+ modalRoot.addEventListener('input',e=>{
+  const id=e.target.id;
+  if(id==='artTitleInput'){studioState.title=e.target.value;scheduleCompose();}
+  else if(id==='artSubtitleInput'){studioState.subtitle=e.target.value;scheduleCompose();}
+  else if(id==='artBadgeInput'){studioState.badge=e.target.value;scheduleCompose();}
+  else if(id==='artAiPrompt'){studioState.aiPrompt=e.target.value;}
+ });
+
+ $('artTmdbSearch')?.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+   e.preventDefault();
+   void loadTmdbCandidates($('artTmdbSearch')?.value||'');
+  }
+ });
+
+ void loadTmdbCandidates(initialTitle);
 }
 
 async function onAction(action,el){
@@ -2182,6 +3111,7 @@ async function onAction(action,el){
  case 'settings-tmdb-complete':return tmdbCompleteAuthorization();
  case 'settings-account-tvmaze':return saveSourceAccount('tvmaze');
  case 'preview-open':return globalThis.NuvioPreview.open(state);
+ case 'open-artwork-studio':return openArtworkStudio(el.dataset.target||'folder');
  case 'collection-rescan':return refreshCollectionInventory(true);
  case 'collection-attach-external':return replaceCollectionSource();
  case 'new-group':return createGroup();
@@ -2210,19 +3140,19 @@ async function onAction(action,el){
  case 'remove-catalog':{
    if(!writable())return;
    const c=catalogs().find(x=>x.id===el.dataset.cat);
-   if(!c||!confirm('Excluir o catálogo '+c.name+'? Também será desvinculado das pastas.'))return;
+   if(!c||!safeConfirm('Excluir o catálogo '+c.name+'? Também será desvinculado das pastas.'))return;
    const k=(c.addonId||'nuvio.studio')+'::'+c.type+'::'+c.id;
    for(const g of groups())for(const f of g.folders||[])
      f.catalogSources=editableSources(f).filter(s=>sourceKey(s)!==k);
    state.workspace.catalogs=catalogs().filter(x=>x!==c);markDirty();render();return;
  }
  case 'delete-group':{
-   if(!writable()||!group()||!confirm('Excluir esta coleção?'))return;
+   if(!writable()||!group()||!safeConfirm('Excluir esta coleção?'))return;
    state.workspace.collections=groups().filter(x=>x!==group());state.selectedGroup=groups()[0]?.id||null;
    state.selectedFolder=null;markDirty();render();return;
  }
  case 'delete-folder':{
-   if(!writable()||!folder()||!confirm('Excluir esta pasta da coleção?'))return;
+   if(!writable()||!folder()||!safeConfirm('Excluir esta pasta da coleção?'))return;
    group().folders=group().folders.filter(x=>x!==folder());
    state.selectedFolder=null;markDirty();render();return;
  }
@@ -2246,7 +3176,7 @@ async function onAction(action,el){
  case 'copy-collections':{
    if(state.collectionInventory==='ready'){
     const checked=collectionResolver().summary(groups());
-    if(checked.missing&&!confirm('A biblioteca tem '+checked.missing+
+    if(checked.missing&&!safeConfirm('A biblioteca tem '+checked.missing+
       ' vínculos de catálogos não localizados. O Nuvio pode mostrar pastas vazias. Deseja copiar o link mesmo assim?'))return;
    }
    return copy(EXPORT);
@@ -2338,14 +3268,11 @@ function onField(event){
    markDirty();if(field!=='folderTitle')render();return;
  }
 }
-$('nav').addEventListener('click',onClick);
-$('app').addEventListener('click',onClick);
-// Arrastar pela alça usa Pointer Events: também funciona no touchscreen,
-// independente da implementação HTML5 DnD do <summary> no Chromium.
-// DnD de Coleções, Pastas e Catálogos: usa Pointer Events em uma única alça,
-// incluindo mouse/caneta/toque. Somente reordena irmãos, sem escrita automática.
 let collectionPointer=null;
 let collectionSuppressClickUntil=0;
+let catalogPointer=null;
+let skipCatalogClickUntil=0;
+let draggedAddon=null;
 function reorderCollectionSlots(level,source,target,after=false,scopeGroup=null,scopeFolder=null){
  if(!state.editable||state.view!=='collections'||!globalThis.NuvioCollectionLinks)return false;
  const g=group(),f=folder();
@@ -2398,6 +3325,9 @@ function autoscrollCollectionDrag(p){
  paintCollectionDrag(p,p.x,p.y);
  p.scrollFrame=requestAnimationFrame(()=>autoscrollCollectionDrag(p));
 }
+if(typeof document!=='undefined'&&$('nav')){
+$('nav').addEventListener('click',onClick);
+$('app').addEventListener('click',onClick);
 $('app').addEventListener('pointerdown',event=>{
  const handle=event.target.closest('.collection-sort-handle');
  if(!handle||event.button!==0||!state.editable||state.view!=='collections')return;
@@ -2467,10 +3397,7 @@ $('app').addEventListener('keydown',event=>{
  }
 });
 
-let catalogPointer=null;
-let skipCatalogClickUntil=0;
 function cleanupCatalogPointer(){
-
  document.querySelectorAll('.hub-catalog-card.is-dragging,.hub-catalog-card.is-drop-target')
   .forEach(e=>e.classList.remove('is-dragging','is-drop-target'));
  catalogPointer=null;
@@ -2510,7 +3437,6 @@ $('app').addEventListener('pointerup',event=>{
  if(moving)event.preventDefault();
 });
 $('app').addEventListener('pointercancel',cleanupCatalogPointer);
-let draggedAddon=null;
 function clearAddonDragFeedback(){
  document.querySelectorAll('.addon-mini.is-dragging,.addon-mini.is-drop-target')
   .forEach(card=>card.classList.remove('is-dragging','is-drop-target'));
@@ -2576,4 +3502,5 @@ setInterval(()=>{
  if(state.view==='addons'&&!document.hidden&&$('modal').hidden)
   void refreshAddonMonitor();
 },25000);
+}
 })();

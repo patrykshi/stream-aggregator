@@ -37,6 +37,16 @@ export function parseAddonUrl(raw) {
   try {
     const urlObj = new URL(trimmed);
 
+    // Extrai credenciais Basic Auth embutidas na URL (evita falha no fetch do Node/undici)
+    let authHeader = null;
+    if (urlObj.username || urlObj.password) {
+      const user = decodeURIComponent(urlObj.username || '');
+      const pass = decodeURIComponent(urlObj.password || '');
+      authHeader = 'Basic ' + Buffer.from(`${user}:${pass}`, 'utf8').toString('base64');
+      urlObj.username = '';
+      urlObj.password = '';
+    }
+
     let pathname = urlObj.pathname;
     if (!pathname.endsWith('/manifest.json')) {
       pathname = pathname.replace(/\/+$/, '') + '/manifest.json';
@@ -51,6 +61,7 @@ export function parseAddonUrl(raw) {
       manifestUrl,
       baseUrl,
       search,
+      authHeader,
       getStreamUrl: (type, id) => `${baseUrl}/stream/${encodeURIComponent(type)}/${encodeURIComponent(id)}.json${search}`,
       getSubtitleUrl: (type, id, extra = '') => {
         return `${baseUrl}/subtitles/${encodeURIComponent(type)}/${encodeURIComponent(id)}${formatExtraPath(extra)}.json${search}`;
@@ -66,10 +77,227 @@ export function parseAddonUrl(raw) {
 }
 
 /**
+ * User-Agent customizado do Nuvio Hub combinado com assinatura compatível Stremio/navegador
+ * para evitar bloqueios por User-Agent genérico em servidores de manifestos de addons.
+ */
+export const ADDON_USER_AGENT = 'NuvioHub/1.0 (Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; Stremio/4.4.168)';
+
+/**
  * Headers realistas para evitar bloqueios de Cloudflare ou anti-scrapers.
  */
 export const DEFAULT_FETCH_HEADERS = {
   'Accept': 'application/json, text/plain, */*',
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Stremio/4.4.168',
+  'User-Agent': ADDON_USER_AGENT,
   'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
 };
+
+/**
+ * Perfis de cabeçalho usados em fallback quando um servidor de addon
+ * retorna HTTP 403/401/406 para o primeiro User-Agent.
+ */
+export const MANIFEST_FETCH_PROFILES = [
+  {
+    ...DEFAULT_FETCH_HEADERS,
+    'Origin': 'https://web.stremio.com',
+    'Referer': 'https://web.stremio.com/',
+    'Cache-Control': 'no-cache'
+  },
+  {
+    'Accept': 'application/json, text/plain, */*',
+    'User-Agent': 'NuvioHub/1.0 Stremio/4.4.168 (Windows NT 10.0; Win64; x64)',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+  },
+  {
+    'Accept': 'application/json, */*;q=0.8',
+    'User-Agent': 'NuvioHub/1.0',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+  }
+];
+
+export function buildAddonFetchHeaders(parsedOrUrl, { authorization = null, profileIndex = 0, extraHeaders = {} } = {}) {
+  const parsed = typeof parsedOrUrl === 'string' ? parseAddonUrl(parsedOrUrl) : parsedOrUrl;
+  const baseProfile = MANIFEST_FETCH_PROFILES[profileIndex] || DEFAULT_FETCH_HEADERS;
+  const headers = {
+    ...baseProfile,
+    'User-Agent': baseProfile['User-Agent'] || ADDON_USER_AGENT,
+    ...extraHeaders
+  };
+  const rawAuth = typeof authorization === 'string' && authorization.trim()
+    ? authorization.trim()
+    : parsed?.authHeader || null;
+  if (rawAuth) {
+    headers['Authorization'] = /^(Basic|Bearer)\s+/i.test(rawAuth) ? rawAuth : `Bearer ${rawAuth}`;
+  }
+  return headers;
+}
+
+export function formatValidatedManifest(manifest) {
+  if (!manifest || typeof manifest !== 'object' || !manifest.id || !manifest.name) {
+    return {
+      valid: false,
+      error: 'JSON retornado não é um manifest Stremio válido (faltando id ou name).'
+    };
+  }
+  const resources = Array.isArray(manifest.resources)
+    ? manifest.resources.map(r => (typeof r === 'string' ? r : r?.name)).filter(Boolean)
+    : [];
+  const catalogs = Array.isArray(manifest.catalogs) ? manifest.catalogs : [];
+  return {
+    valid: true,
+    id: String(manifest.id),
+    name: String(manifest.name),
+    description: manifest.description || '',
+    resources,
+    hasStreamResource: resources.includes('stream'),
+    hasSubtitlesResource: resources.includes('subtitles'),
+    hasCatalogResource: catalogs.length > 0 || resources.includes('catalog'),
+    catalogs,
+    types: Array.isArray(manifest.types) ? manifest.types : []
+  };
+}
+
+/**
+ * Valida a sintaxe, segurança e acessibilidade de um manifesto de addon no servidor,
+ * aplicando rotação de User-Agent/Origin em caso de HTTP 403/401/406 e suporte a autorização.
+ */
+export async function validateAddonManifestOnServer(rawUrl, {
+  authorization = null,
+  clientManifest = null,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 25000
+} = {}) {
+  if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.trim()) {
+    return { statusCode: 400, body: { valid: false, error: 'URL inválida ou vazia.' } };
+  }
+
+  const parsed = parseAddonUrl(rawUrl);
+  if (!parsed) {
+    return { statusCode: 400, body: { valid: false, error: 'Formato de URL inválido.' } };
+  }
+
+  try {
+    const u = new URL(parsed.manifestUrl);
+    const host = (u.hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+    if (
+      host === 'localhost' || host === '0.0.0.0' || host === '::1' || host.endsWith('.local') ||
+      /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) ||
+      /^169\.254\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    ) {
+      return {
+        statusCode: 400,
+        body: { valid: false, error: 'Endereços locais ou privados não são permitidos para addons externos.' }
+      };
+    }
+  } catch {
+    return { statusCode: 400, body: { valid: false, error: 'Formato de URL inválido.' } };
+  }
+
+  // Se o navegador já obteve o manifesto via CORS (fallback para IPs de datacenter bloqueados por Cloudflare 403)
+  if (clientManifest && typeof clientManifest === 'object') {
+    const formatted = formatValidatedManifest(clientManifest);
+    return { statusCode: 200, body: { ...formatted, normalizedUrl: parsed.manifestUrl } };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    let lastResponse = null;
+    for (let i = 0; i < MANIFEST_FETCH_PROFILES.length; i++) {
+      const headers = buildAddonFetchHeaders(parsed, { authorization, profileIndex: i });
+      lastResponse = await fetchImpl(parsed.manifestUrl, {
+        signal: controller.signal,
+        headers,
+        redirect: 'follow'
+      });
+      if (lastResponse.ok) break;
+      // Repete com próximo perfil de User-Agent/Origin apenas em erros de bloqueio/autorização HTTP
+      if (![401, 403, 406].includes(lastResponse.status)) break;
+    }
+
+    clearTimeout(timeoutId);
+
+    if (!lastResponse || !lastResponse.ok) {
+      const status = lastResponse?.status || 502;
+      const hint = status === 403
+        ? 'O servidor retornou HTTP 403 (acesso negado ou protegido por firewall/Cloudflare).'
+        : status === 401
+          ? 'O servidor retornou HTTP 401 (autorização ou token exigido pelo addon).'
+          : `O servidor retornou HTTP ${status}`;
+      return {
+        statusCode: 200,
+        body: {
+          valid: false,
+          httpStatus: status,
+          normalizedUrl: parsed.manifestUrl,
+          error: hint
+        }
+      };
+    }
+
+    const manifest = await lastResponse.json();
+    const formatted = formatValidatedManifest(manifest);
+    return {
+      statusCode: 200,
+      body: { ...formatted, normalizedUrl: parsed.manifestUrl }
+    };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    const isAbort = controller.signal.aborted || err?.name === 'AbortError' || err?.name === 'TimeoutError';
+    return {
+      statusCode: 200,
+      body: {
+        valid: false,
+        normalizedUrl: parsed.manifestUrl,
+        error: isAbort
+          ? 'Tempo limite esgotado (15s). O servidor do addon demorou muito para responder.'
+          : 'Erro de conexão com o addon.'
+      }
+    };
+  }
+}
+
+/**
+ * Verifica se a requisição tem permissão de edição local.
+ * Bloqueia qualquer tráfego vindo do Cloudflare Tunnel (cf-connecting-ip)
+ * ou de origens externas não autorizadas.
+ */
+export function isLocalEditorRequest(req, currentPort = 7001) {
+  const getHeader = name => (typeof req?.get === 'function' ? req.get(name) : req?.headers?.[name.toLowerCase()]);
+  if (getHeader('cf-connecting-ip') || getHeader('cf-ew-via')) return false;
+
+  const host = String(getHeader('host') || '').split(':')[0].trim().toLowerCase();
+  const isLoopbackHost = ['127.0.0.1', 'localhost', '[::1]'].includes(host);
+  if (!isLoopbackHost) return false;
+
+  const forwardedHostRaw = String(getHeader('x-forwarded-host') || '').split(',')[0].trim().toLowerCase();
+  const forwardedHostname = forwardedHostRaw.split(':')[0];
+  if (forwardedHostname === 'stream.patrykrocha.com') return false;
+
+  const secFetchSite = String(getHeader('sec-fetch-site') || '').trim().toLowerCase();
+  const origin = getHeader('origin');
+  if (origin) {
+    if (origin === 'null') {
+      return secFetchSite === 'same-origin';
+    }
+    try {
+      const u = new URL(origin);
+      const originHostname = u.hostname.toLowerCase();
+      const allowedPorts = new Set(['7001', '3000', '8080', String(currentPort)]);
+      const isLocalOrigin = ['127.0.0.1', 'localhost', '[::1]'].includes(originHostname) &&
+        (!u.port || allowedPorts.has(u.port));
+      const isForwardedMatch = Boolean(forwardedHostRaw) && (
+        u.host.toLowerCase() === forwardedHostRaw ||
+        originHostname === forwardedHostname
+      );
+      const isSameOriginPreview = (secFetchSite === 'same-origin' || secFetchSite === 'same-site') &&
+        (originHostname.endsWith('.run.app') || originHostname.endsWith('.google.com'));
+      if (!isLocalOrigin && !isForwardedMatch && !isSameOriginPreview) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+

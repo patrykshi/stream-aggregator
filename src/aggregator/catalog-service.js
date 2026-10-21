@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { resolveDataDir, readJsonFile, writeAtomicJsonFile, validatePublicHttpsUrl } from '../config/json-store.js';
-import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './url-helper.js';
+import { parseAddonUrl, DEFAULT_FETCH_HEADERS, buildAddonFetchHeaders } from './url-helper.js';
 import { mergeAndDeduplicateMetas } from './catalogs.js';
 import { applyStudioOverlay, getStudioDocument } from './collection-overlay.js';
 import { loadStudioImport, getStudioImportStatus } from './studio-import.js';
@@ -94,8 +94,9 @@ export function authorizedBridge(req) {
     crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
 }
 async function pullJSON(url) {
-  const response = await fetch(checkURL(url), {
-    headers: { ...DEFAULT_FETCH_HEADERS, 'Cache-Control': 'no-cache' },
+  const checkedUrl = checkURL(url);
+  const response = await fetch(checkedUrl, {
+    headers: buildAddonFetchHeaders(checkedUrl, { extraHeaders: { 'Cache-Control': 'no-cache' } }),
     signal: AbortSignal.timeout(18000),
     redirect: 'error'
   });

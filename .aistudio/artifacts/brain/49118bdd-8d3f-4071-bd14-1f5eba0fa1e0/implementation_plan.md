@@ -1,117 +1,82 @@
-# Diagnóstico Arquitetural e Eliminação de Redundâncias — Nuvio Hub
+# Plano de Implementação: Aba Coleções, Prévia no Nuvio e Estúdio Multi-Formato de Capas & Ícones
 
-Este plano detalha o diagnóstico completo da base de código do **Nuvio Hub (Stream Aggregator)** e a estratégia cirúrgica para eliminar duplicações estruturais no backend (persistência atômica, rotas triplicadas Stremio/Nuvio, resolução de metadados e validação de URLs) e no frontend (blocos CSS duplicados/obsoletos, sistemas duplos de Drag-and-Drop e helpers repetidos de paginação e busca), preservando 100% de aprovação na suíte de testes e todas as garantias de segurança local (`requireLocalEdit` e permissões `0600`).
+## 1. Visão Geral do Produto e Objetivos
 
----
+Este plano detalha as três melhorias solicitadas para a aba **Coleções** do **Nuvio Hub**:
 
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> As decisões abaixo refletem suas escolhas confirmadas na etapa de alinhamento e preservam integralmente os contratos públicos e testes automatizados existentes.
-
-- **Decisão Confirmada 1 — Escopo de Execução**: Diagnosticar e refatorar as redundâncias tanto no backend quanto no frontend mantendo **100% dos testes passando** (`npm test`), sem remover endpoints legados exigidos pela suíte de regressão.
-- **Decisão Confirmada 2 — Consolidação no Backend**:
-  1. Unificar a leitura e gravação atômica de JSON com permissão `0600` (atualmente espalhada e reimplementada em 8 módulos distintos) em um utilitário centralizado de persistência segura.
-  2. Consolidar os manipuladores triplicados de rotas Stremio v2 e Nuvio (`manifest.json`, `stream`, `subtitles`, `catalog`, `meta`, `collections.json`) nos três prefixos (`/`, `/p/:profileId`, `/:config`) e remover chamadas redundantes em `/api/catalog-bridge/collections.json` (onde `await publication()` é executado duas vezes na mesma requisição).
-  3. Unificar a resolução de metadados locais (`localMetadata`) e higienização/validação HTTPS de URLs entre o servidor e os módulos de agregação.
-- **Decisão Confirmada 3 — Otimização no Frontend**:
-  1. Limpar blocos de CSS mortos ou sobrescritos (cartões legados `.addon-priority-card`, duplicações de variáveis `:root`, regras duplicadas de `.collection-sort-*` e a primeira versão obsoleta de `.nuvio-preview-*` que foi integralmente reescrita no final da folha de estilos).
-  2. Unificar o sistema duplicado de Drag-and-Drop em `public/app.js` (onde Catálogos registram tanto Pointer Events quanto HTML5 Drag-and-Drop simultaneamente) e padronizar os manipuladores de reordenação.
-  3. Extrair helpers reutilizáveis para paginação, filtragem textual e acesso normalizado a fontes de pastas (`catalogSources`), reduzindo código repetitivo nos modais e painéis.
+1. **Unificação do Botão de Prévia:** Remover a faixa redundante `.collection-preview-workflow` (`"Abrir simulador de TV →"`) e manter exclusivamente o botão de ação no cabeçalho da aba Coleções, renomeando-o para **"Prévia no Nuvio"**.
+2. **Remodelação Fiel da "Prévia no Nuvio" (Baseada no Vídeo de Referência):** Substituir o fluxo antigo de múltiplos níveis intermediários por um **Modal Dedicado em Tela Cheia** que reproduz exatamente a experiência de Smart TV e Celular demonstrada no vídeo:
+   - **Cabeçalho do Modal:** Título *"Prévia da tela inicial do Nuvio"*, subtítulo *"Confira como suas coleções, capas e abas serão exibidas"*, seletor de dispositivo **`TV` | `Celular`** e botão fechar **`✕`**.
+   - **Tela Inicial (Home):** Barra lateral esquerda com ícones de navegação (`⌂` Início, `⌕` Busca, `⚙` Configurações), **Carrossel Hero** no topo com destaque cinematográfico (título, gêneros, ano, sinopse, botão `Ver Detalhes` e indicadores de carrossel) e trilhos horizontais para cada coleção (`✦ Descobrir`, `✦ Streaming`, etc.) exibindo a contagem de pastas à direita e os cartões das pastas respeitando a proporção configurada em cada pasta (`LANDSCAPE 16:9`, `POSTER 2:3`, `PORTRAIT 3:4` ou `SQUARE 1:1`).
+   - **Abertura Direta da Pasta (Abas + Grade de 6 Colunas):** Ao clicar em qualquer pasta da Home, abrir diretamente a visualização da pasta com cabeçalho imersivo (miniatura da capa na proporção da pasta, coleção de origem, título da pasta e total de fontes), **abas horizontais em formato pílula** para cada fonte configurada na pasta (com a aba ativa destacada em branco) e **grade de pôsteres em 6 colunas** (no modo TV) com cartões *skeleton* pulsantes durante o carregamento dos itens reais da fonte selecionada.
+3. **Estúdio Multi-Formato de Criação de Capas e Ícones (TMDB + Temas + IA):** Integrar no editor de Coleções e Pastas uma ferramenta completa de geração visual que suporta **todos os tamanhos e proporções das coleções e pastas**, salvando o ativo gerado localmente no Hub (`data/artwork/` servido em `/api/hub/artwork/:filename`) e vinculando automaticamente a URL e a proporção (`tileShape`) na pasta ou coleção.
 
 ---
 
-## 1. Overview & Core Concept
+## 2. Formatos e Proporções Suportados no Estúdio de Capas
 
-- **What It Does**: O **Nuvio Hub** opera como um agregador universal Stremio v2 e estúdio de curadoria de catálogos e coleções para o Nuvio, combinando consultas paralelas a múltiplos addons, deduplicação de streams, adaptação de capas (WebP/ERDB) e simulação interativa de TV/Mobile.
-- **Diagnóstico de Redundâncias Encontradas**:
-  - **Camada de Persistência (Backend)**: Oito módulos implementam manualmente sua própria rotina de leitura `JSON.parse(fs.readFileSync(...))` e escrita atômica via arquivo temporário `.tmp` + `fs.renameSync` com `mode: 0o600`.
-  - **Camada de Rotas Stremio/Nuvio (Backend)**: As rotas raiz (`/stream/...`), de perfil (`/p/:profileId/stream/...`) e parametrizadas (`/:config/stream/...`) repetem blocos idênticos de `try/catch`, cabeçalhos `Cache-Control`, resolução de parâmetros `extra` e decoração ERDB. Além disso, `localMetadata()` está duplicada no servidor e no módulo de publicação, e `publication()` é invocada duas vezes seguidas na rota de coleções da ponte.
-  - **Folha de Estilos Dark Mode (Frontend)**: Ao longo da evolução do produto para o *Nuvio Studio v2*, novos blocos de estilo foram concatenados ao final da folha de estilos sem remover as versões anteriores. Isso resultou em redefinições completas de `:root`, `.collection-sort-*`, `.nuvio-preview-*` e centenas de linhas de classes órfãs (`.addon-priority-card`, `.addon-number`, `.addon-origin`, `.addon-health-metrics`) que não existem mais no DOM.
-  - **Interatividade e Estado no Painel (Frontend)**: A aba de Catálogos mantém dois motores de arraste concorrentes para os mesmos cartões (Pointer Events na alça `.hub-catalog-drag` e HTML5 Drag-and-Drop no `<summary>`), além de quatro implementações quase idênticas de barra de busca paginada e normalização manual repetitiva de `f.catalogSources || f.sources || []`.
-- **Key Value**: Redução expressiva de código morto e acoplamento, menor superfície para bugs de sincronização visual ou de cache, respostas mais rápidas nas rotas de coleções e manutenção simplificada sem alterar nenhuma funcionalidade visível ao usuário.
+O Estúdio detecta automaticamente o `tileShape` atual da pasta (ou o tipo de ativo da coleção) e permite escolher e pré-visualizar em tempo real qualquer um dos formatos oficiais do Nuvio:
 
----
+| Formato no Nuvio | Proporção | Resolução de Exportação | Aplicação Principal | Layout do Mosaico / Composição |
+| :--- | :---: | :---: | :--- | :--- |
+| **`LANDSCAPE`** | **16:9** | `1280 × 720 px` | Capas horizontais de pastas (Estilo TV / Streaming) e Backdrops de Coleção | Colagem panorâmica (3 pôsteres inclinados, *backdrop* cinematográfico ou grade 2×2 com vinheta lateral/inferior) |
+| **`POSTER`** | **2:3** | `600 × 900 px` | Capas verticais clássicas de pastas (Estilo Cartaz de Cinema) | Pôster principal em tela cheia com camada de iluminação, ou tríptico vertical / grade 2×2 de cartazes do catálogo |
+| **`PORTRAIT`** | **3:4** | `750 × 1000 px` | Capas retrato para pastas (compatível com conversão automática no Nuvio Legacy) | Composição retrato equilibrada com arte de destaque centralizada e espaço tipográfico |
+| **`SQUARE`** | **1:1** | `800 × 800 px` | Pastas quadradas, ícones de coleções e insígnias de canais/estúdios | Ícone centralizado, mosaico simétrico 2×2 de pôsteres ou emblema de streaming/gênero |
+| **`HERO BACKDROP`** | **16:9 Wide** | `1920 × 1080 px` | Imagem de fundo (`backdropImageUrl`) da Coleção inteira | *Backdrop* em alta definição com *scrim* escuro cinematográfico pronto para leitura de interface |
 
-## 2. User Experience & Visual Design
-
-- **Key User Flows Preservados**:
-  - Navegação fluida entre as 7 áreas do espaço de trabalho (*Visão geral*, *Addons*, *Catálogos*, *Coleções*, *Monitoramento*, *Publicar no Nuvio* e *Configurações*).
-  - Reordenação por arraste e teclado em Addons, Catálogos, Coleções, Pastas e Fontes com feedback imediato de posição e persistência segura.
-  - Fluxo em 4 etapas no Criador Avançado de Catálogos (Fonte → Preferências → Prévia → Salvar) e Simulador Nuvio TV/Mobile em tempo real.
-- **Visual Identity & Theme (Dark Mode Utilitário de Alta Densidade)**:
-  - *Aesthetic Direction*: Console técnico escuro de alta precisão, com superfícies em camadas sutis e bordas de 1px (`--line: #29384b`).
-  - *Color Palette & Mood*: Canvas dominante em ardósia profunda (`--bg: #090d15`), superfícies estruturais (`--surface: #121b29`, `--card: #172334`), texto principal de alto contraste (`--txt: #f1f6fc`, `--muted: #9cabbd`) e acentos semânticos precisos (`--accent: #9dd9fa` para foco/ações primárias, `--teal: #64d3ad` para status operacional ativo e `--danger: #fb9eac` para alertas e exclusões).
-  - *Typography & Hierarchy*: `Manrope` (pesos 600–800) para títulos, contadores e cabeçalhos; `DM Sans` (400–700) para leitura densa em listas e formulários; e `font-variant-numeric: tabular-nums` / `ui-monospace` para latências, contadores de prioridade e chaves técnicas.
-  - *Component Styling & Layout*: Layout fixo de barra lateral (`250px` no desktop, colapsada em telas menores) + barra superior com migalhas de pão e ação primária única (`Salvar alterações`) + área de trabalho responsiva de até `1660px`.
-- **Interactive Feedback & Motion**: Transições rápidas de `140ms–170ms` apenas em propriedades de composição/cor, indicadores claros de rascunho não salvo (`Alterações não salvas`), estados de carregamento sem bloqueio e respeito estrito a `prefers-reduced-motion: reduce`.
+> **Sincronização Inteligente:** Quando o usuário gera e aplica uma capa em uma pasta escolhendo `LANDSCAPE (16:9)`, `POSTER (2:3)`, `PORTRAIT (3:4)` ou `SQUARE (1:1)`, o Estúdio atualiza tanto o campo de imagem (`customCoverImageUrl` / `coverImageUrl`) quanto o seletor `folderShape` (`tileShape`) da pasta automaticamente para evitar distorções ou cortes indesejados.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 3. Componentes e Fluxos Técnicos
 
-- **Decision 1 — Utilitário Único de Persistência JSON Atômica (`0600`)**
-  - *Chosen Approach*: Centralizar as operações `readJsonFile` e `writeAtomicJsonFile` (com criação de diretório, arquivo temporário por PID, `mode: 0o600`, `renameSync` e limpeza segura em bloco `finally`) e reutilizá-las nos módulos de configuração e agregação.
-  - *Why*: Elimina 8 implementações ligeiramente divergentes (algumas sem `finally` para limpar arquivos `.tmp` órfãos ou sem `chmodSync` explícito), fortalecendo a invariante de segurança de dados em `data/`.
-  - *Alternatives Considered*: Manter funções locais em cada arquivo (descartado por dificultar auditoria de permissões `0600` e gerar código repetido).
-- **Decision 2 — Unificação de Handlers Stremio v2 e Nuvio por Helpers de Resolução**
-  - *Chosen Approach*: Extrair funções coordenadoras para resolução do perfil/configuração efetiva e despacho unificado de `manifest`, `stream`, `subtitles`, `catalog`, `meta` e `collections`, mantendo exatamente as mesmas assinaturas de rota Express (`/`, `/p/:profileId`, `/:config`).
-  - *Why*: Reduz mais de 150 linhas repetidas no servidor, garante cabeçalhos `Cache-Control` e tratamento de erros consistentes e elimina a dupla execução de `await publication()` na rota de coleções.
-  - *Alternatives Considered*: Redirecionamento HTTP 302 entre rotas (descartado porque clientes Stremio e Nuvio nem sempre seguem redirecionamentos em rotas de manifesto/stream ou sofrem penalidade de latência).
-- **Decision 3 — Consolidação de CSS e Drag-and-Drop no Frontend**
-  - *Chosen Approach*: Mesclar as definições finais do design system *Nuvio Studio v2* diretamente nas regras base da folha de estilos, removendo seletores mortos (`.addon-priority-card` e derivados) e duplicatas do simulador Nuvio, além de remover o listener HTML5 Drag-and-Drop redundante de Catálogos (que já utiliza Pointer Events com suporte a mouse, toque e caneta).
-  - *Why*: Reduz drasticamente o tamanho e a complexidade de `styles.css` e evita conflitos de eventos onde um arraste em Catálogos dispara tanto `pointerdown` quanto `dragstart`.
-  - *Alternatives Considered*: Reescrever o Drag-and-Drop de Addons para Pointer Events também (mantido HTML5 DnD no `<summary>` de Addons pois testes existentes e a semântica de `<details>` dependem do atributo `draggable` no cabeçalho do addon).
+### 3.1. Limpeza e Unificação na Aba Coleções (`public/app.js`)
+- Na função `renderCollections()`:
+  - Alterar o rótulo do botão principal no cabeçalho (`pageTitle`) de `'▶ Simular no Nuvio'` para `'Prévia no Nuvio'`.
+  - Remover integralmente o bloco `<div class="collection-preview-workflow">...</div>` que exibia o segundo botão redundante `"Abrir simulador de TV →"`.
+  - Adicionar no painel **Editar coleção** (ao lado de *Imagem de fundo*) e no painel **Editar pasta** (ao lado de *Imagem da capa* e *Proporção*) o botão **"✦ Criar capa / ícone"** que abre o Estúdio já pré-configurado com o formato (`tileShape`) atual da pasta ou coleção.
+
+### 3.2. Novo Simulador "Prévia no Nuvio" (`public/nuvio-preview.js` e `public/styles.css`)
+- **Estrutura do Modal:**
+  - Abre diretamente em tela cheia com cabeçalho contendo:
+    - Esquerda: Título **"Prévia da tela inicial do Nuvio"** e subtítulo **"Confira como suas coleções, capas e abas serão exibidas"**.
+    - Direita: Botões de alternância **`TV`** e **`Celular`** + botão de fechamento **`✕`**.
+- **Estado `home` (Tela Inicial):**
+  - **Sidebar Esquerda (TV):** Ícones de navegação vertical (`⌂` Início, `⌕` Busca, `⚙` Configurações).
+  - **Hero Banner Carousel:** Alimentado dinamicamente pelos títulos em destaque das fontes configuradas, com pontos indicadores (*dots*) clicáveis, título grande, metadados (`Gênero • Ano`), sinopse e botão `Ver Detalhes`.
+  - **Trilhos de Coleções:** Lista todas as coleções visíveis com ícone `✦`, nome da coleção à esquerda e contador `<N> pastas` à direita. Abaixo de cada cabeçalho, fileira horizontal de cartões de pastas renderizados na proporção exata configurada em cada pasta (`16:9` para `LANDSCAPE`, `2:3` para `POSTER`, `3:4` para `PORTRAIT` e `1:1` para `SQUARE`), exibindo a arte da capa e o título da pasta na base (respeitando `hideTitle`).
+- **Estado `folder` (Visualização Direta da Pasta com Abas e Grade):**
+  - Ao clicar em qualquer pasta na Home, abre diretamente a tela de abas da pasta (sem tela intermediária de lista de fontes).
+  - **Cabeçalho da Pasta:** Botão `← Voltar` + miniatura da capa da pasta (respeitando sua proporção) + sobretítulo `✦ NOME DA COLEÇÃO`, título grande da pasta e subtítulo `<N> fontes`.
+  - **Barra de Abas de Fontes:** Pílulas horizontais clicáveis para cada fonte da pasta (`Nome da Fonte • Filmes/Séries`), com a aba ativa destacada em branco sólido.
+  - **Grade de 6 Colunas + Skeletons:** Exibe 12 cartões *skeleton* pulsantes em grade de 6 colunas (TV) ou 3 colunas (Celular) durante o carregamento via `/api/nuvio-preview/source`, substituindo-os pelos pôsteres reais com título e ano assim que a resposta retorna.
+
+### 3.3. Estúdio Multi-Formato de Capas e Ícones (`public/app.js`, `src/server.js`, `src/aggregator/artwork-studio.js`)
+- **Seletor Global de Formato no Topo do Modal do Estúdio:**
+  - Permite alternar instantaneamente o canvas de criação entre **`Landscape 16:9`**, **`Poster 2:3`**, **`Portrait 3:4`** e **`Square 1:1`** (além de **`Backdrop 16:9 HD`** quando aberto a partir de uma Coleção).
+- **Três Modos de Criação Adaptáveis a Todos os Formatos:**
+  1. **Mosaico / Arte TMDB:**
+     - Carrega automaticamente os pôsteres e *backdrops* dos filmes/séries presentes nas fontes daquela pasta (ou permite pesquisar qualquer título no TMDB).
+     - Oferece layouts inteligentes que se adaptam à proporção escolhida:
+       - *Destaque Único:* Pôster (`2:3` / `3:4`) ou Backdrop (`16:9` / `1:1`) em tela cheia com gradiente e tipografia.
+       - *Tríptico / Leque de Cartazes:* 3 pôsteres combinados lado a lado ou em perspectiva dinâmica (funciona em `16:9`, `2:3`, `3:4` e `1:1`).
+       - *Mosaico 2×2:* Grade de 4 títulos da pasta com vinheta escura e selo/título centralizado ou na base.
+  2. **Galeria de Logos & Temas Prontos:**
+     - Presets vetoriais de serviços de streaming (Netflix, Prime Video, Disney+, Max, Apple TV+, Globoplay, Crunchyroll, Paramount+, etc.) e categorias/gêneros (Em Alta, Lançamentos, Terror, Ficção Científica, Anime, Infantil, Documentários, 4K UHD).
+     - Adapta automaticamente o dimensionamento do logo, o brilho radial e a posição do título para `16:9`, `2:3`, `3:4` ou `1:1`, com controles de cor de fundo, textura e opção de ocultar texto (`hideTitle`).
+  3. **Geração por IA (Gemini Image):**
+     - Integração server-side com `@google/genai` (`gemini-3.1-flash-lite-image`) passando a proporção selecionada (`16:9`, `3:4`, `1:1` e recorte de precisão `2:3` para Poster) e o prompt temático da pasta/coleção.
+- **Persistência Local e Vínculo Automático:**
+  - `POST /api/hub/artwork/save` e `POST /api/hub/artwork/generate-ai` (protegidos por `requireLocalEdit`) salvam o arquivo em `data/artwork/<id>.png` e retornam a URL local `/api/hub/artwork/<id>.png`.
+  - `GET /api/hub/artwork/:filename` serve a imagem com cache otimizado.
+  - Clicar em **"Salvar e Aplicar"** grava a imagem localmente no Hub, preenche a URL na pasta/coleção e sincroniza o `tileShape` da pasta com o formato escolhido.
 
 ---
 
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+## 4. Verificação e Testes Automatizados (`node:test`)
 
-### Architecture & Component Diagram
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        FRONTEND (Vanilla JS + Dark CSS)                      │
-│                                                                              │
-│  ┌─────────────────────┐  ┌──────────────────────┐  ┌─────────────────────┐  │
-│  │   Workspace Views   │  │  Shared UI Helpers   │  │ Specialized Modules │  │
-│  │ (Overview, Addons,  │─▶│ • Paginated Search   │  │ • Collection Links  │  │
-│  │  Catalogs, Studio,  │  │ • Source Normalizer  │  │ • Nuvio TV Preview  │  │
-│  │  Monitor, Settings) │  │ • Unified DnD Engine │  │ • Custom UI Selects │  │
-│  └─────────┬───────────┘  └──────────────────────┘  └──────────┬──────────┘  │
-└────────────┼───────────────────────────────────────────────────┼─────────────┘
-             │ REST API (requireLocalEdit on mutations)          │ Read-Only
-             ▼                                                   ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                         BACKEND (Express + ES Modules)                       │
-│                                                                              │
-│  ┌────────────────────────────────────┐  ┌────────────────────────────────┐  │
-│  │   Unified Stremio/Nuvio Routers    │  ┌────────────────────────────────┐  │
-│  │ • /manifest, /stream, /subtitles   │  │   Local Management Endpoints   │  │
-│  │ • /catalog, /meta, /collections    │  │ • /api/hub/* (Workspace/Lists) │  │
-│  │ • Shared across /, /p/:id, /:token │  │ • /api/profiles/* & /monitor   │  │
-│  └─────────────────┬──────────────────┘  └────────────────┬───────────────┘  │
-│                    │                                      │                  │
-│                    ▼                                      ▼                  │
-│  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │                     Aggregator & Publication Engine                    │  │
-│  │  • Stream/Subtitle Engine & Filter   • Catalog Builder & List Import   │  │
-│  │  • Nuvio Publication & Bridge        • Cover Adapter (WebP) & ERDB     │  │
-│  └─────────────────────────────────┬──────────────────────────────────────┘  │
-│                                    │                                         │
-│                                    ▼                                         │
-│  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │              Shared Atomic JSON Storage Utility (mode 0600)            │  │
-│  │                     (data/*.json & backup rotation)                    │  │
-│  └────────────────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Data Model & State
-- **Utilitário de Persistência Atômica**: Função compartilhada para leitura segura com fallback e escrita atômica via arquivo temporário (`<file>.<pid>.tmp`) com permissão `0600`, utilizada pelos módulos de perfis, integrações, contas de origem, ERDB, importação do Studio, overlays e provedores de publicação.
-- **Identidade e Fontes de Catálogo**: Função única para geração de identidade de catálogo (`[addonId, type, id]`) e leitura de `catalogSources` de pastas, evitando divergências entre o estado em memória do navegador e a validação no servidor.
-
-### Interactive Component & State Mapping
-- **Unified Route Dispatcher (Servidor)**: Mapeia requisições de `/`, `/p/:profileId` e `/:config` para handlers únicos de recursos (`serveManifest`, `serveStreams`, `serveSubtitles`, `serveCatalog`, `serveMeta`, `serveCollections`), distinguindo automaticamente o perfil principal (`main`, com suporte a publicação Nuvio, metadados locais e decoração de capas ERDB) de perfis secundários ou tokens codificados.
-- **Paginated List & Search Helpers (Frontend)**: Centraliza o cálculo de páginas (`Math.max(1, Math.ceil(total / pageSize))`), fatia de itens e renderização dos controles `Anterior / Próxima` usados no Criador de Catálogos, no seletor em lote de Addons e no modal de substituição de vínculos de Coleções.
-- **Drag-and-Drop Desambiguado (Frontend)**: Mantém Pointer Events dedicados para reordenação na aba de Catálogos e Coleções (removendo os handlers duplicados de `dragstart`/`dragover`/`drop` para `.hub-catalog-card`), enquanto preserva o arraste de `<summary draggable>` na aba de Addons sem interferência cruzada.
+- Atualizar `test/nuvio-preview.test.js` e `test/nuvio-universal-studio.test.js` para validar:
+  - Abertura direta da pasta com abas de fontes e grade de 6 colunas no simulador.
+  - Suporte às diferentes proporções (`LANDSCAPE`, `POSTER`, `PORTRAIT`, `SQUARE`) tanto na prévia quanto no salvamento de capas locais via `/api/hub/artwork/save`.
+  - Proteção `requireLocalEdit` nas rotas de criação/salvamento de arte e 100% de aprovação em `npm test`.

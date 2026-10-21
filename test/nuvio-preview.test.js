@@ -89,4 +89,49 @@ describe('Amostra segura de catálogo no Preview do Nuvio',()=>{
   assert.ok(url.includes('skip=100'), 'o preview usa janelas Stremio de 100 em vez de skip=12');
   assert.ok(!url.includes('evil'));
  });
+ it('mantém apenas o botão "Prévia no Nuvio" na aba Coleções e abre pasta direto nas abas com grade e skeletons',async()=>{
+  const fs=await import('node:fs');
+  const appCode=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+  const previewCode=fs.readFileSync(new URL('../public/nuvio-preview.js',import.meta.url),'utf8');
+  assert.ok(appCode.includes('Prévia no Nuvio'),'Deve exibir o botão "Prévia no Nuvio"');
+  assert.ok(!appCode.includes('Abrir simulador de TV'),'Não deve manter o slot redundante "Abrir simulador de TV"');
+  assert.ok(appCode.includes('open-artwork-studio'),'Deve incluir gatilho para o Estúdio de Capas e Ícones');
+  assert.ok(previewCode.includes('Prévia da tela inicial do Nuvio'),'Modal deve exibir título fiel ao vídeo');
+  assert.ok(previewCode.includes('nuvio-preview-hero'),'Home deve renderizar o carrossel Hero');
+  assert.ok(previewCode.includes('nuvio-preview-tab'),'Pasta deve renderizar abas de fontes horizontais');
+  assert.ok(previewCode.includes('nuvio-preview-skeleton-card'),'Grade deve exibir 12 skeletons durante carregamento');
+ });
+ it('vincula seletores de proporção (16:9, 2:3, 3:4, 1:1) do Artwork Studio ao estado da coleção ou pasta e atualiza tileShape',async()=>{
+  const fs=await import('node:fs');
+  const appCode=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+  await import('../public/app.js');
+  const binding=globalThis.ArtworkStudioShapeBinding;
+  assert.ok(binding,'ArtworkStudioShapeBinding deve estar exposto para sincronizar proporções');
+  assert.equal(binding.normalizeTileShape('16:9'),'LANDSCAPE');
+  assert.equal(binding.normalizeTileShape('2:3'),'POSTER');
+  assert.equal(binding.normalizeTileShape('3:4'),'PORTRAIT');
+  assert.equal(binding.normalizeTileShape('1:1'),'SQUARE');
+  assert.equal(binding.tileShapeCssAspectRatio('POSTER'),'2/3');
+  assert.equal(binding.tileShapeCssAspectRatio('PORTRAIT'),'3/4');
+  assert.equal(binding.tileShapeCssAspectRatio('SQUARE'),'1/1');
+  assert.equal(binding.tileShapeCssAspectRatio('LANDSCAPE'),'16/9');
+
+  const folderState={id:'f-test',title:'Destaques',tileShape:'LANDSCAPE'};
+  for(const [ratio,expectedShape] of [['16:9','LANDSCAPE'],['2:3','POSTER'],['3:4','PORTRAIT'],['1:1','SQUARE']]){
+   const applied=binding.applyTargetTileShape(folderState,ratio,{isGroup:false});
+   assert.equal(applied,expectedShape);
+   assert.equal(folderState.tileShape,expectedShape);
+  }
+
+  const groupState={id:'g-test',title:'Streaming',folders:[{id:'f-sub',title:'Catálogo'}]};
+  const groupApplied=binding.applyTargetTileShape(groupState,'2:3',{isGroup:true});
+  assert.equal(groupApplied,'POSTER');
+  assert.equal(groupState.tileShape,'POSTER');
+  assert.equal(groupState.folders[0].tileShape,'POSTER');
+
+  assert.ok(appCode.includes('data-tile-shape='),'Botões de proporção do Studio devem expor data-tile-shape');
+  assert.ok(appCode.includes('data-art-ratio='),'Botões de proporção do Studio devem expor data-art-ratio');
+ });
 });
+
+

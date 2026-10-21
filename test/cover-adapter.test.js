@@ -82,4 +82,61 @@ describe('Nuvio TV Cover Adapter',()=>{
    assert.equal(await getPreparedCover('LANDSCAPE',id,{fetchFn}),null);
    assert.equal(await getPreparedCover('SQUARE','a'.repeat(32),{fetchFn}),null);
  });
+ it('gera capas no Estúdio em todos os 5 formatos (LANDSCAPE, POSTER, PORTRAIT, SQUARE, BACKDROP) e adapta exportação local',async()=>{
+   const {STUDIO_SHAPES,STUDIO_PRESETS,composeStudioArtwork,generateAiStudioArtwork,saveDataUrlArtwork,getSavedStudioArtwork}=await import('../src/aggregator/artwork-studio.js');
+   assert.ok(STUDIO_PRESETS.length>=16);
+   for(const shapeKey of ['LANDSCAPE','POSTER','PORTRAIT','SQUARE','BACKDROP']){
+     const spec=STUDIO_SHAPES[shapeKey];
+     assert.ok(spec);
+     const presetRes=await composeStudioArtwork({
+       mode:'preset',
+       shape:shapeKey,
+       presetId:'netflix',
+       title:'Netflix',
+       subtitle:'Coleção Oficial'
+     });
+     assert.equal(presetRes.shape,shapeKey);
+     assert.equal(presetRes.width,spec.width);
+     assert.equal(presetRes.height,spec.height);
+     assert.match(presetRes.dataUrl,/^data:image\/webp;base64,/);
+
+     const saved=await saveDataUrlArtwork(presetRes.dataUrl,shapeKey);
+     assert.match(saved.url,new RegExp(`^/api/hub/artwork/studio/art_${shapeKey.toLowerCase()}_[a-f0-9]{24}\\.webp$`));
+     const diskBuf=getSavedStudioArtwork(saved.filename);
+     assert.ok(diskBuf && diskBuf.length>100);
+     const meta=await sharp(diskBuf).metadata();
+     assert.equal(meta.width,spec.width);
+     assert.equal(meta.height,spec.height);
+     assert.equal(supportedCover(saved.url),true);
+   }
+
+   const aiRes=await generateAiStudioArtwork({
+     prompt:'Cyberpunk neon samurai city at night',
+     shape:'POSTER',
+     title:'Sci-Fi Cult',
+     subtitle:'Clássicos',
+     apiKey:''
+   });
+   assert.equal(aiRes.shape,'POSTER');
+   assert.equal(aiRes.width,600);
+   assert.equal(aiRes.height,900);
+   const savedAi=await saveDataUrlArtwork(aiRes.dataUrl,'POSTER');
+
+   const customCollections=[{
+     id:'col-1',
+     title:'Sci-Fi',
+     coverImageUrl:savedAi.url,
+     folders:[{
+       id:'f-1',
+       title:'Destaques',
+       tileShape:'POSTER',
+       coverImageUrl:savedAi.url,
+       customCoverImageUrl:savedAi.url
+     }]
+   }];
+   const exported=prepareCoverCollections(customCollections);
+   assert.equal(exported.adapted,1);
+   assert.match(exported.collections[0].folders[0].coverImageUrl,/^https:\/\/stream\.patrykrocha\.com\/api\/hub\/artwork\/studio\/art_poster_[a-f0-9]{24}\.webp$/);
+ });
 });
+

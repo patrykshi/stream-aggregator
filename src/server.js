@@ -15,7 +15,8 @@ import { encodeConfig, decodeConfig, getDefaultConfig } from './config/codec.js'
 import { listProfiles, getProfile, getProfileConfig, saveProfile, deleteProfile } from './config/profiles.js';
 import { aggregateStreams, normalizeAddonBaseUrl } from './aggregator/engine.js';
 import { generateManifest } from './aggregator/manifest.js';
-import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './aggregator/url-helper.js';
+import { parseAddonUrl, DEFAULT_FETCH_HEADERS, buildAddonFetchHeaders, isLocalEditorRequest, validateAddonManifestOnServer } from './aggregator/url-helper.js';
+import { validatePublicHttpsUrl } from './config/json-store.js';
 import { aggregateSubtitles } from './aggregator/subtitles.js';
 import { fetchCatalog, fetchMeta } from './aggregator/catalogs.js';
 import { checkAddons, getMonitorReport, startMonitor, effectiveConfig, monitorRevision } from './aggregator/monitor.js';
@@ -23,6 +24,7 @@ import { getBridgeSettings, saveBridgeSettings, previewExternalAddon, catalogKey
 import { getStudioDocument, saveStudioDocument, getStudioHistory, restoreStudioRevision, getStudioStatus } from './aggregator/collection-overlay.js';
 import { loadStudioImport, getStudioImportStatus, saveStudioImport, validateStudioImport, previewWorkspaceChange, applyWorkspaceChange } from './aggregator/studio-import.js';
 import { prepareCoverCollections, getPreparedCover, registerCover, getCoverAdapterStatus, supportedCover, normalizeShape } from './aggregator/cover-adapter.js';
+import { STUDIO_SHAPES, STUDIO_PRESETS, getSavedStudioArtwork, saveDataUrlArtwork, composeStudioArtwork, generateAiStudioArtwork, searchTmdbArtworkCandidates } from './aggregator/artwork-studio.js';
 import { getPublication, publishedCatalog, publishedMeta, localMetadata, registerPublicationProvider, removePublicationProvider, listPublicationProviders, invalidatePublication } from './aggregator/nuvio-publication.js';
 
 dotenv.config();
@@ -120,18 +122,7 @@ app.post('/api/monitor/check', requireLocalEdit, async (req, res) => {
 // oferecendo APIs de playback e JSON em modo público somente-leitura.
 // O Host deve ser loopback: cabeçalhos Cloudflare jamais dão acesso à edição.
 function localEditor(req) {
-  const host=(req.get('host')||'').split(':')[0].toLowerCase();
-  const local=['127.0.0.1','localhost','[::1]'].includes(host);
-  if(!local || req.get('cf-connecting-ip'))return false;
-  const origin=req.get('origin');
-  if(origin) {
-    try {
-      const u=new URL(origin);
-      if(!['127.0.0.1','localhost','[::1]'].includes(u.hostname))return false;
-      if(u.port && !['7001',String(PORT)].includes(u.port))return false;
-    }catch{return false;}
-  }
-  return true;
+  return isLocalEditorRequest(req, PORT);
 }
 function requireLocalEdit(req,res,next){
   if(!localEditor(req))return res.status(403).json({
@@ -349,6 +340,70 @@ app.post('/api/hub/artwork/preview', requireBridgeAdmin, (req,res) => {
   const {url,shape}=req.body||{};
   if(!supportedCover(url))return res.status(400).json({error:'Imagem não suportada. Utilize uma fonte HTTPS permitida.'});
   res.json({url:registerCover(url,normalizeShape(shape)),shape:normalizeShape(shape)});
+});
+app.get('/api/hub/artwork/studio-presets', requireLocalEdit, (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ shapes: STUDIO_SHAPES, presets: STUDIO_PRESETS });
+});
+app.post('/api/hub/artwork/tmdb-candidates', requireLocalEdit, async (req, res) => {
+  try {
+    const { query = '', sources = [] } = req.body || {};
+    const saved = loadStudioImport();
+    const allCatalogs = saved?.manifest?.catalogs || [];
+    const localItems = [];
+    for (const src of Array.isArray(sources) ? sources : []) {
+      const cat = allCatalogs.find(c => c.type === src?.type && c.id === (src?.catalogId || src?.catalog_id));
+      if (cat && Array.isArray(cat.metas)) {
+        localItems.push(...cat.metas.slice(0, 12));
+      }
+    }
+    if (!localItems.length) {
+      for (const cat of allCatalogs) {
+        if (Array.isArray(cat.metas)) localItems.push(...cat.metas.slice(0, 6));
+        if (localItems.length >= 18) break;
+      }
+    }
+    const result = await searchTmdbArtworkCandidates({ query, localItems });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'Não foi possível buscar artes no TMDB.' });
+  }
+});
+app.post('/api/hub/artwork/compose', requireLocalEdit, async (req, res) => {
+  try {
+    const result = await composeStudioArtwork(req.body || {});
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'Falha ao compor capa.' });
+  }
+});
+app.post('/api/hub/artwork/generate-ai', requireLocalEdit, async (req, res) => {
+  try {
+    const result = await generateAiStudioArtwork(req.body || {});
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'Falha ao gerar arte com IA.' });
+  }
+});
+app.post('/api/hub/artwork/save', requireLocalEdit, async (req, res) => {
+  try {
+    const { dataUrl, shape, title, mode } = req.body || {};
+    const saved = await saveDataUrlArtwork(dataUrl, { shape, title, mode });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true, ...saved });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'Falha ao salvar capa localmente.' });
+  }
+});
+app.get('/api/hub/artwork/studio/:filename', (req, res) => {
+  const bytes = getSavedStudioArtwork(req.params.filename);
+  if (!bytes) return res.status(404).end();
+  res.setHeader('Content-Type', 'image/webp');
+  res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=86400');
+  res.end(bytes);
 });
 app.get('/api/hub/artwork/:shape/:key.webp', async (req,res) => {
   try {
@@ -680,6 +735,22 @@ app.get('/api/nuvio-studio/workspace',(_req,res)=>{
   res.setHeader('Cache-Control','no-store');
   res.json(getStudioImportStatus());
 });
+app.post('/api/nuvio-studio/fetch-json',requireBridgeAdmin,async(req,res)=>{
+  try{
+    const checkedUrl=validatePublicHttpsUrl(req.body?.url);
+    const r=await fetch(checkedUrl,{
+      headers:buildAddonFetchHeaders(checkedUrl,{extraHeaders:{'Cache-Control':'no-cache'}}),
+      signal:AbortSignal.timeout(15000),
+      redirect:'follow'
+    });
+    if(!r.ok)throw Error('A URL retornou HTTP '+r.status);
+    const text=(await r.text()).replace(/^\uFEFF/,'').trim();
+    if(Buffer.byteLength(text,'utf8')>10*1024*1024)throw Error('Arquivo excede 10 MB.');
+    const data=JSON.parse(text);
+    res.setHeader('Cache-Control','no-store');
+    res.json({data});
+  }catch(e){res.status(400).json({error:e.message||'Não foi possível baixar o JSON da URL informada.'});}
+});
 app.post('/api/nuvio-studio/workspace/preview',requireBridgeAdmin,(req,res)=>{
   try{
     const proposal=previewWorkspaceChange(req.body||{});
@@ -769,77 +840,13 @@ app.get('/studio', (_req,res) => res.redirect(302,'/?view=collections'));
 
 // Validador de Addons (usado pela UI)
 app.post('/api/validate-addon', requireLocalEdit, async (req, res) => {
-  const { url } = req.body;
-  if (!url || typeof url !== 'string') {
-    return res.status(400).json({ valid: false, error: 'URL inválida ou vazia.' });
-  }
-
-  const parsed = parseAddonUrl(url);
-  if (!parsed) {
-    return res.status(400).json({ valid: false, error: 'Formato de URL inválido.' });
-  }
-
-  const manifestUrl = parsed.manifestUrl;
-  console.log('[Validate Addon] Consulta de manifesto');
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 segundos para scrapers lentos
-
-  try {
-    const response = await fetch(manifestUrl, {
-      signal: controller.signal,
-      headers: DEFAULT_FETCH_HEADERS,
-      redirect: 'follow'
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.warn('[Validate Addon] HTTP não OK');
-      return res.status(200).json({
-        valid: false,
-        error: `O servidor retornou HTTP ${response.status}`
-      });
-    }
-
-    const manifest = await response.json();
-    if (!manifest || !manifest.id || !manifest.name) {
-      console.warn('[Validate Addon] Manifesto inválido');
-      return res.status(200).json({
-        valid: false,
-        error: 'JSON retornado não é um manifest Stremio válido (faltando id ou name).'
-      });
-    }
-
-    const resources = Array.isArray(manifest.resources)
-      ? manifest.resources.map(r => typeof r === 'string' ? r : r.name)
-      : [];
-
-    const catalogs = Array.isArray(manifest.catalogs) ? manifest.catalogs : [];
-
-    console.log(`[Validate Addon] Sucesso: "${manifest.name}" (recursos: ${resources.join(', ')})`);
-
-    return res.json({
-      valid: true,
-      name: manifest.name,
-      description: manifest.description || '',
-      resources,
-      hasStreamResource: resources.includes('stream'),
-      hasSubtitlesResource: resources.includes('subtitles'),
-      hasCatalogResource: catalogs.length > 0 || resources.includes('catalog'),
-      catalogs,
-      types: manifest.types || []
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    console.error('[Validate Addon] Falha de conexão');
-    return res.status(200).json({
-      valid: false,
-      error: err.name === 'AbortError'
-        ? 'Tempo limite esgotado (15s). O servidor do addon demorou muito para responder.'
-        : 'Erro de conexão com o addon.'
-    });
-  }
+  const { url, authorization, manifest: clientManifest } = req.body || {};
+  const authToken = authorization || req.get('x-addon-authorization') || null;
+  const result = await validateAddonManifestOnServer(url, {
+    authorization: authToken,
+    clientManifest
+  });
+  return res.status(result.statusCode).json(result.body);
 });
 
 // API Helper para codificar/decodificar

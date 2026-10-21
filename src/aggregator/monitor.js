@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { resolveDataDir, readJsonFile, writeAtomicJsonFile } from '../config/json-store.js';
-import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './url-helper.js';
+import { parseAddonUrl, DEFAULT_FETCH_HEADERS, buildAddonFetchHeaders } from './url-helper.js';
 
 const HEALTH_INTERVAL_MS = 5 * 60 * 1000;
 const MANIFEST_TIMEOUT_MS = 6000;
@@ -125,7 +125,7 @@ export async function checkAddons(getConfig, { force = false } = {}) {
           try {
             const response = await fetch(parsed.manifestUrl, {
               signal: AbortSignal.timeout(MANIFEST_TIMEOUT_MS),
-              headers: DEFAULT_FETCH_HEADERS
+              headers: buildAddonFetchHeaders(parsed)
             });
             httpStatus = response.status;
             if (!response.ok) {

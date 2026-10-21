@@ -1,6 +1,6 @@
 {
-  "summary":  "Plano arquitetural e de refatoracao para eliminacao de redundancias no backend e no frontend do Nuvio Hub (Stream Aggregator), mantendo 100% de compatibilidade com a suite de testes e o protocolo Stremio v2.",
-  "updatedAt":  "2026-10-21T20:16:49.702908749Z",
+  "summary":  "Plano de implementação revisado para incluir suporte completo a todas as proporções e tamanhos existentes nas coleções e pastas (Landscape 16:9, Poster 2:3, Portrait 3:4, Square 1:1 e Backdrop 16:9 de Coleção) em todos os modos do Estúdio de Capas e Ícones (Mosaico TMDB, Temas/Logos prontos e IA Gemini Image), além da sincronização automática com o campo tileShape da pasta.",
+  "updatedAt":  "2026-10-21T23:02:22.669890456Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
