@@ -1,13 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { resolveDataDir, readJsonFile, writeAtomicJsonFile, validatePublicHttpsUrl } from '../config/json-store.js';
 import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './url-helper.js';
 import { mergeAndDeduplicateMetas } from './catalogs.js';
 import { applyStudioOverlay, getStudioDocument } from './collection-overlay.js';
 import { loadStudioImport, getStudioImportStatus } from './studio-import.js';
 
 export const BRIDGE_ADDON_ID = 'community.streamaggregator.unified';
-const DATA = process.env.DATA_DIR || path.resolve('data');
+const DATA = resolveDataDir();
 const CONFIG_FILE = path.join(DATA, 'hub-catalog-settings.json');
 const CACHE_FILE = path.join(DATA, 'hub-catalog-cache.json');
 const SECRET_FILE = path.join(DATA, 'legacy-unused-admin-key');
@@ -25,30 +26,12 @@ let cache = null, cacheTime = 0, fetching = null, lastError = null, lastSuccess 
 let adminToken;
 
 function ensureDir() { fs.mkdirSync(DATA, { recursive: true }); }
-function readJSON(file, fallback) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
-}
-function atomicJSON(file, value) {
-  ensureDir();
-  const tmp = file + '.' + process.pid + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
-  fs.renameSync(tmp, file);
-}
+const readJSON = (file, fallback) => readJsonFile(file, fallback);
+const atomicJSON = (file, value) => writeAtomicJsonFile(file, value);
 export function getBridgeSettings() {
   return { ...DEFAULTS, ...readJSON(CONFIG_FILE, {}) };
 }
-function checkURL(raw) {
-  if (typeof raw !== 'string' || raw.length > 1500) throw new Error('URL inválida ou muito longa');
-  const url = new URL(raw);
-  const host = url.hostname.toLowerCase();
-  if (url.protocol !== 'https:' || url.username || url.password || url.port ||
-      host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal') ||
-      host.endsWith('.localhost') || /^[0-9.]+$/.test(host) ||
-      host.includes(':') || !host.includes('.')) {
-    throw new Error('Use uma URL pública HTTPS, sem credenciais embutidas na URL');
-  }
-  return url.toString();
-}
+const checkURL = raw => validatePublicHttpsUrl(raw);
 function safeText(value, max = 100) {
   return String(value || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, max);
 }

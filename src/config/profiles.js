@@ -2,63 +2,48 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getDefaultConfig, sanitizeConfig } from './codec.js';
+import { resolveDataDir, readJsonFile, writeAtomicJsonFile } from './json-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Diretório de dados persistentes
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../data');
+const DATA_DIR = resolveDataDir(path.join(__dirname, '../../data'));
 const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
 const DEFAULT_NUVIO_PATH = path.join(__dirname, '../../public/default-nuvio-collections.json');
 
 // Garante que o diretório existe
 try {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
+  fs.mkdirSync(DATA_DIR, { recursive: true });
 } catch (err) {
   console.warn('[Profiles] Erro ao criar diretório de dados:', err.message);
 }
 
 // Carrega o template padrão de coleções Nuvio se disponível
 function getDefaultNuvioCollections() {
-  try {
-    if (fs.existsSync(DEFAULT_NUVIO_PATH)) {
-      return JSON.parse(fs.readFileSync(DEFAULT_NUVIO_PATH, 'utf-8'));
+  return readJsonFile(DEFAULT_NUVIO_PATH, []);
+}
+
+function buildDefaultMainEntry() {
+  return {
+    name: 'Principal',
+    updatedAt: new Date().toISOString(),
+    config: {
+      ...getDefaultConfig(),
+      nuvioCollections: getDefaultNuvioCollections()
     }
-  } catch (err) {
-    console.warn('[Profiles] Erro ao ler coleções padrão:', err.message);
-  }
-  return [];
+  };
 }
 
 /**
  * Lê todos os perfis armazenados no arquivo JSON.
  */
 function readProfilesMap() {
-  try {
-    if (fs.existsSync(PROFILES_FILE)) {
-      const raw = fs.readFileSync(PROFILES_FILE, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') {
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('[Profiles] Erro ao ler profiles.json, usando fallback em memória:', err.message);
-  }
+  const parsed = readJsonFile(PROFILES_FILE, null, { requireObject: true });
+  if (parsed) return parsed;
 
   // Se não existir, inicializa com o perfil 'main'
-  const initialMap = {
-    main: {
-      name: 'Principal',
-      updatedAt: new Date().toISOString(),
-      config: {
-        ...getDefaultConfig(),
-        nuvioCollections: getDefaultNuvioCollections()
-      }
-    }
-  };
+  const initialMap = { main: buildDefaultMainEntry() };
   saveProfilesMap(initialMap);
   return initialMap;
 }
@@ -68,17 +53,7 @@ function readProfilesMap() {
  */
 function saveProfilesMap(profilesMap) {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    // Escrita atômica + chmod 0600 para credenciais de addons.
-    const temp=PROFILES_FILE+'.'+process.pid+'.tmp';
-    try {
-      fs.writeFileSync(temp,JSON.stringify(profilesMap,null,2),{encoding:'utf-8',mode:0o600});
-      fs.chmodSync(temp,0o600);
-      fs.renameSync(temp,PROFILES_FILE);
-      fs.chmodSync(PROFILES_FILE,0o600);
-    }finally{try{fs.unlinkSync(temp);}catch{}}
+    writeAtomicJsonFile(PROFILES_FILE, profilesMap);
     return true;
   } catch (err) {
     console.error('[Profiles] Erro ao salvar profiles.json:', err.message);
@@ -114,15 +89,10 @@ export function getProfileConfig(profileId = 'main') {
 
   // Se for o perfil main ou se não encontrar, entrega o padrão sanitizado
   if (cleanId === 'main' || cleanId === 'default') {
-    const def = getDefaultConfig();
-    def.nuvioCollections = getDefaultNuvioCollections();
-    map[cleanId] = {
-      name: 'Principal',
-      updatedAt: new Date().toISOString(),
-      config: def
-    };
+    const newEntry = buildDefaultMainEntry();
+    map[cleanId] = newEntry;
     saveProfilesMap(map);
-    return def;
+    return newEntry.config;
   }
 
   return null;
@@ -138,13 +108,7 @@ export function getProfile(profileId = 'main') {
 
   if (!entry) {
     if (cleanId === 'main') {
-      const def = getDefaultConfig();
-      def.nuvioCollections = getDefaultNuvioCollections();
-      const newEntry = {
-        name: 'Principal',
-        updatedAt: new Date().toISOString(),
-        config: def
-      };
+      const newEntry = buildDefaultMainEntry();
       map['main'] = newEntry;
       saveProfilesMap(map);
       return { id: 'main', ...newEntry };

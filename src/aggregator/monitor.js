@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import fs from 'node:fs';
 import path from 'node:path';
+import { resolveDataDir, readJsonFile, writeAtomicJsonFile } from '../config/json-store.js';
 import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './url-helper.js';
 
 const HEALTH_INTERVAL_MS = 5 * 60 * 1000;
@@ -13,29 +13,21 @@ const searches = new Map();
 const visuals = new Map();
 let visualsLoadedFrom = null;
 function artworkFile(){
-  return path.join(process.env.DATA_DIR || path.resolve('data'),'addon-visuals.json');
+  return path.join(resolveDataDir(),'addon-visuals.json');
 }
 function readArtworkCache(){
   const filename=artworkFile();
   if(filename===visualsLoadedFrom)return;
   visuals.clear();visualsLoadedFrom=filename;
-  try{
-    const doc=JSON.parse(fs.readFileSync(filename,'utf8'));
-    for(const [key,url] of Object.entries(doc||{})){
-      if(/^[a-f0-9]{16}$/.test(key) && typeof url==='string' &&
-         url.length<=1500 && url.startsWith('https://'))visuals.set(key,url);
-    }
-  }catch{
-    // Primeiro uso, nenhum arquivo ainda.
+  const doc=readJsonFile(filename,null);
+  for(const [key,url] of Object.entries(doc||{})){
+    if(/^[a-f0-9]{16}$/.test(key) && typeof url==='string' &&
+       url.length<=1500 && url.startsWith('https://'))visuals.set(key,url);
   }
 }
 function writeArtworkCache(){
   try{
-    const file=artworkFile();
-    fs.mkdirSync(path.dirname(file),{recursive:true});
-    const temp=file+'.'+process.pid+'.tmp';
-    fs.writeFileSync(temp,JSON.stringify(Object.fromEntries(visuals))+'\n',{mode:0o600});
-    fs.renameSync(temp,file);
+    writeAtomicJsonFile(artworkFile(),Object.fromEntries(visuals));
   }catch(error){
     console.warn('Cache de imagens de addon não atualizado:',error.message);
   }

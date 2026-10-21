@@ -1,17 +1,16 @@
 // Perfis pessoais das origens. Segredos em arquivo local (0600), sem retorno via API.
-import fs from 'node:fs';
 import path from 'node:path';
-const DATA=process.env.DATA_DIR||path.resolve('data');
+import { resolveDataDir, readJsonFile, writeAtomicJsonFile } from './json-store.js';
+const DATA=resolveDataDir();
 const FILE=path.join(DATA,'hub-source-accounts.json');
 const FIELDS={
  traktUsername:{type:'username'},tvmazeUsername:{type:'username'},
  tvmazeKey:{type:'secret'},tmdbAccountId:{type:'numeric'},
  tmdbSessionId:{type:'secret'}
 };
-function read(){try{
- const data=JSON.parse(fs.readFileSync(FILE,'utf8'));
- return data&&typeof data==='object'&&!Array.isArray(data)?data:{};
-}catch(e){if(e.code==='ENOENT')return {};throw Error('Erro ao ler conexões de fontes.');}}
+function read(){
+ return readJsonFile(FILE,{},{strict:true,requireObject:true,errorMessage:'Erro ao ler conexões de fontes.'});
+}
 export function getSourceAccount(field){
  if(!Object.hasOwn(FIELDS,field))throw Error('Campo de origem desconhecido.');
  return String(read()[field]||'');
@@ -46,11 +45,6 @@ export function updateSourceAccounts(payload){
    throw Error('Token de integração inválido.');
   next[field]=v;
  }
- fs.mkdirSync(DATA,{recursive:true,mode:0o700});
- const tmp=FILE+'.'+process.pid+'.tmp';
- try{
-  fs.writeFileSync(tmp,JSON.stringify(next,null,2)+'\n',{mode:0o600,flag:'wx'});
-  fs.renameSync(tmp,FILE);fs.chmodSync(FILE,0o600);
- }finally{try{fs.unlinkSync(tmp);}catch{}}
+ writeAtomicJsonFile(FILE,next);
  return sourceAccountStatus();
 }

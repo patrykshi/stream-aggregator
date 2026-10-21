@@ -23,7 +23,7 @@ import { getBridgeSettings, saveBridgeSettings, previewExternalAddon, catalogKey
 import { getStudioDocument, saveStudioDocument, getStudioHistory, restoreStudioRevision, getStudioStatus } from './aggregator/collection-overlay.js';
 import { loadStudioImport, getStudioImportStatus, saveStudioImport, validateStudioImport, previewWorkspaceChange, applyWorkspaceChange } from './aggregator/studio-import.js';
 import { prepareCoverCollections, getPreparedCover, registerCover, getCoverAdapterStatus, supportedCover, normalizeShape } from './aggregator/cover-adapter.js';
-import { getPublication, publishedCatalog, publishedMeta, registerPublicationProvider, removePublicationProvider, listPublicationProviders, invalidatePublication } from './aggregator/nuvio-publication.js';
+import { getPublication, publishedCatalog, publishedMeta, localMetadata, registerPublicationProvider, removePublicationProvider, listPublicationProviders, invalidatePublication } from './aggregator/nuvio-publication.js';
 
 dotenv.config();
 
@@ -170,11 +170,12 @@ app.get(['/api/catalog-bridge/collections.json','/api/hub/collections.json'], as
   }
   try {
     const snapshot = await bridgeSnapshot({ force: req.query.refresh === '1' });
+    const pub = await publication();
     res.setHeader('Cache-Control', 'private, max-age=60');
     res.setHeader('X-Catalog-Bridge-State', snapshot.stale ? 'stale' : 'fresh');
-    const output=prepareCoverCollections((await publication()).collections);
+    const output = prepareCoverCollections(pub.collections);
     res.setHeader('X-Nuvio-Artwork-Prepared', String(output.adapted));
-    res.setHeader('X-Nuvio-Sources-Routed', String((await publication()).status.routed));
+    res.setHeader('X-Nuvio-Sources-Routed', String(pub.status.routed));
     res.json(output.collections);
   } catch (e) { handleBridgeError(res, e); }
 });
@@ -209,15 +210,6 @@ async function mainManifestWithBridge(config) {
     }
     return result;
   } catch (e) { console.warn('[Catalog Hub] Manifesto preservado:', e.message); return base; }
-}
-function localMetadata(type,id){
-  const workspace=loadStudioImport();
-  for(const catalog of workspace?.manifest?.catalogs||[]){
-    if(!catalog.manual || catalog.type!==type)continue;
-    const meta=(catalog.metas||[]).find(item=>item.id===id);
-    if(meta)return {meta:{...meta,type}};
-  }
-  return null;
 }
 async function publication() {
   const config = effectiveConfig(getProfileConfig('main') || getDefaultConfig());
@@ -910,6 +902,74 @@ function resolveConfig(param) {
   return decodeConfig(param);
 }
 
+function resolveScopedConfig(rawParam) {
+  const base = resolveConfig(rawParam);
+  return rawParam === 'main' ? effectiveConfig(base) : base;
+}
+
+async function handleStreamRequest(req, res, config, logPrefix = '') {
+  const { type, id } = req.params;
+  try {
+    const result = await aggregateStreams(config, type, id);
+    res.setHeader('Cache-Control', 'max-age=60, stale-while-revalidate=120');
+    res.json(result);
+  } catch (err) {
+    console.error(`${logPrefix}Erro ao agregar streams:`, err);
+    res.status(500).json({ streams: [], error: err.message });
+  }
+}
+
+async function handleSubtitlesRequest(req, res, config, logPrefix = '') {
+  const { type, id, extra } = req.params;
+  try {
+    const result = await aggregateSubtitles(config, type, id, extra || '');
+    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+    res.json(result);
+  } catch (err) {
+    console.error(`${logPrefix}Erro ao agregar legendas:`, err);
+    res.status(500).json({ subtitles: [], error: err.message });
+  }
+}
+
+async function handleCatalogRequest(req, res, config, { useMainBridge = false, decorate = false, logPrefix = '' } = {}) {
+  const { type, id, extra } = req.params;
+  const extraParam = resolveExtraParam(extra, req.query);
+  try {
+    const result = await (useMainBridge
+      ? mainCatalogWithBridge(config, type, id, extraParam)
+      : fetchCatalog(config, type, id, extraParam));
+    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
+    res.json(decorate ? decorateCatalogResponse(result, type) : result);
+  } catch (err) {
+    console.error(`${logPrefix}Erro ao consultar catálogo:`, err);
+    res.status(500).json({ metas: [], error: err.message });
+  }
+}
+
+async function handleMetaRequest(req, res, config, { useMainBridge = false, decorate = false, logPrefix = '' } = {}) {
+  const { type, id } = req.params;
+  try {
+    const manual = useMainBridge ? localMetadata(type, id) : null;
+    const result = manual || await fetchMeta(config, type, id);
+    const fallback = !result?.meta && useMainBridge ? await publishedMeta(type, id, await publication()) : result;
+    res.setHeader('Cache-Control', 'max-age=3600, stale-while-revalidate=7200');
+    res.json(decorate ? decorateMetaResponse(fallback, type) : fallback);
+  } catch (err) {
+    console.error(`${logPrefix}Erro ao consultar metadados:`, err);
+    res.status(500).json({ meta: null, error: err.message });
+  }
+}
+
+async function handlePublishedCollections(res) {
+  try {
+    const output = prepareCoverCollections((await publication()).collections);
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    return res.json(output.collections);
+  } catch (e) {
+    return handleBridgeError(res, e);
+  }
+}
+
 // ==========================================================================
 // ROTAS DE PERFIS (URLs Curtas & Sincronizadas: /p/:profileId/...)
 // ==========================================================================
@@ -919,230 +979,100 @@ app.get('/p/:profileId/manifest.json', async (req, res) => {
   res.json(req.params.profileId === 'main' ? await mainManifestWithBridge(config) : generateManifest(config));
 });
 
-app.get('/p/:profileId/stream/:type/:id.json', async (req, res) => {
-  const { profileId, type, id } = req.params;
+app.get('/p/:profileId/stream/:type/:id.json', (req, res) => {
+  const { profileId } = req.params;
   const config = getProfileConfig(profileId) || getDefaultConfig();
-  try {
-    const result = await aggregateStreams(config, type, id);
-    res.setHeader('Cache-Control', 'max-age=60, stale-while-revalidate=120');
-    res.json(result);
-  } catch (err) {
-    console.error(`[Profile ${profileId}] Erro ao agregar streams:`, err);
-    res.status(500).json({ streams: [], error: err.message });
-  }
+  return handleStreamRequest(req, res, config, `[Profile ${profileId}] `);
 });
 
-app.get(['/p/:profileId/subtitles/:type/:id.json', '/p/:profileId/subtitles/:type/:id/:extra.json'], async (req, res) => {
-  const { profileId, type, id, extra } = req.params;
+app.get(['/p/:profileId/subtitles/:type/:id.json', '/p/:profileId/subtitles/:type/:id/:extra.json'], (req, res) => {
+  const { profileId } = req.params;
   const config = getProfileConfig(profileId) || getDefaultConfig();
-  try {
-    const result = await aggregateSubtitles(config, type, id, extra || '');
-    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
-    res.json(result);
-  } catch (err) {
-    console.error(`[Profile ${profileId}] Erro ao agregar legendas:`, err);
-    res.status(500).json({ subtitles: [], error: err.message });
-  }
+  return handleSubtitlesRequest(req, res, config, `[Profile ${profileId}] `);
 });
 
-app.get(['/p/:profileId/catalog/:type/:id.json', '/p/:profileId/catalog/:type/:id/:extra.json'], async (req, res) => {
-  const { profileId, type, id, extra } = req.params;
+app.get(['/p/:profileId/catalog/:type/:id.json', '/p/:profileId/catalog/:type/:id/:extra.json'], (req, res) => {
+  const { profileId } = req.params;
   const config = getProfileConfig(profileId) || getDefaultConfig();
-  const extraParam = resolveExtraParam(extra, req.query);
-  try {
-    const result = await (profileId === 'main'
-      ? mainCatalogWithBridge(config, type, id, extraParam)
-      : fetchCatalog(config, type, id, extraParam));
-    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
-    res.json(profileId==='main'?decorateCatalogResponse(result,type):result);
-  } catch (err) {
-    console.error(`[Profile ${profileId}] Erro ao consultar catálogo:`, err);
-    res.status(500).json({ metas: [], error: err.message });
-  }
+  const isMain = profileId === 'main';
+  return handleCatalogRequest(req, res, config, { useMainBridge: isMain, decorate: isMain, logPrefix: `[Profile ${profileId}] ` });
 });
 
-app.get('/p/:profileId/meta/:type/:id.json', async (req, res) => {
-  const { profileId, type, id } = req.params;
+app.get('/p/:profileId/meta/:type/:id.json', (req, res) => {
+  const { profileId } = req.params;
   const config = getProfileConfig(profileId) || getDefaultConfig();
-  try {
-    const manual=profileId==='main'?localMetadata(type,id):null;
-    const result = manual || await fetchMeta(config, type, id);
-    const fallback = !result?.meta && profileId === 'main' ? await publishedMeta(type, id, await publication()) : result;
-    res.setHeader('Cache-Control', 'max-age=3600, stale-while-revalidate=7200');
-    res.json(profileId==='main'?decorateMetaResponse(fallback,type):fallback);
-  } catch (err) {
-    console.error(`[Profile ${profileId}] Erro ao consultar metadados:`, err);
-    res.status(500).json({ meta: null, error: err.message });
-  }
+  const isMain = profileId === 'main';
+  return handleMetaRequest(req, res, config, { useMainBridge: isMain, decorate: isMain, logPrefix: `[Profile ${profileId}] ` });
 });
 
 app.get('/p/:profileId/collections.json', async (req, res) => {
-  if (req.params.profileId === 'main') {
-    try {
-      const output=prepareCoverCollections((await publication()).collections);
-      res.setHeader('Cache-Control','public, max-age=60');
-      return res.json(output.collections);
-    }catch(e){return handleBridgeError(res,e);}
-  }
-  const config=getProfileConfig(req.params.profileId)||getDefaultConfig();
-  res.json(config.nuvioCollections||[]);
+  if (req.params.profileId === 'main') return handlePublishedCollections(res);
+  const config = getProfileConfig(req.params.profileId) || getDefaultConfig();
+  res.json(config.nuvioCollections || []);
 });
 
 // ==========================================================================
 // ROTAS GLOBAIS RAIZ (Apontam para o Perfil 'main' por padrão)
 // ==========================================================================
 
-// Stremio: Manifest raiz (perfil main)
 app.get('/manifest.json', async (req, res) => {
   try {
-    const data=await publication();
-    res.setHeader('Cache-Control','public, max-age=60');
+    const data = await publication();
+    res.setHeader('Cache-Control', 'public, max-age=60');
     res.json(data.manifest);
-  } catch(e) { handleBridgeError(res,e); }
+  } catch (e) { handleBridgeError(res, e); }
 });
 
-// Stremio: Stream raiz (perfil main)
-app.get('/stream/:type/:id.json', async (req, res) => {
-  const { type, id } = req.params;
+app.get('/stream/:type/:id.json', (req, res) => {
   const config = effectiveConfig(getProfileConfig('main') || getDefaultConfig());
-  try {
-    const result = await aggregateStreams(config, type, id);
-    res.setHeader('Cache-Control', 'max-age=60, stale-while-revalidate=120');
-    res.json(result);
-  } catch (err) {
-    console.error('[Root Stream] Erro ao agregar streams:', err);
-    res.status(500).json({ streams: [], error: err.message });
-  }
+  return handleStreamRequest(req, res, config, '[Root Stream] ');
 });
 
-// Stremio: Subtitles raiz (perfil main)
-app.get(['/subtitles/:type/:id.json', '/subtitles/:type/:id/:extra.json'], async (req, res) => {
-  const { type, id, extra } = req.params;
+app.get(['/subtitles/:type/:id.json', '/subtitles/:type/:id/:extra.json'], (req, res) => {
   const config = effectiveConfig(getProfileConfig('main') || getDefaultConfig());
-  try {
-    const result = await aggregateSubtitles(config, type, id, extra || '');
-    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
-    res.json(result);
-  } catch (err) {
-    console.error('[Root Subtitles] Erro ao agregar legendas:', err);
-    res.status(500).json({ subtitles: [], error: err.message });
-  }
+  return handleSubtitlesRequest(req, res, config, '[Root Subtitles] ');
 });
 
-// Stremio: Catalog raiz (perfil main)
-app.get(['/catalog/:type/:id.json', '/catalog/:type/:id/:extra.json'], async (req, res) => {
-  const { type, id, extra } = req.params;
+app.get(['/catalog/:type/:id.json', '/catalog/:type/:id/:extra.json'], (req, res) => {
   const config = effectiveConfig(getProfileConfig('main') || getDefaultConfig());
-  const extraParam = resolveExtraParam(extra, req.query);
-  try {
-    const result = await mainCatalogWithBridge(config, type, id, extraParam);
-    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
-    res.json(decorateCatalogResponse(result,type));
-  } catch (err) {
-    console.error('[Root Catalog] Erro ao consultar catálogo:', err);
-    res.status(500).json({ metas: [], error: err.message });
-  }
+  return handleCatalogRequest(req, res, config, { useMainBridge: true, decorate: true, logPrefix: '[Root Catalog] ' });
 });
 
-// Stremio: Meta raiz (perfil main)
-app.get('/meta/:type/:id.json', async (req, res) => {
-  const { type, id } = req.params;
+app.get('/meta/:type/:id.json', (req, res) => {
   const config = effectiveConfig(getProfileConfig('main') || getDefaultConfig());
-  try {
-    const result = localMetadata(type,id) || await fetchMeta(config, type, id);
-    const fallback = result?.meta ? result : await publishedMeta(type, id, await publication());
-    res.setHeader('Cache-Control', 'max-age=3600, stale-while-revalidate=7200');
-    res.json(decorateMetaResponse(fallback,type));
-  } catch (err) {
-    console.error('[Root Meta] Erro ao consultar metadados:', err);
-    res.status(500).json({ meta: null, error: err.message });
-  }
+  return handleMetaRequest(req, res, config, { useMainBridge: true, decorate: true, logPrefix: '[Root Meta] ' });
 });
 
-// Nuvio: Collections raiz (perfil main)
-app.get('/collections.json', async (req, res) => {
-  try{
-    const output=prepareCoverCollections((await publication()).collections);
-    res.setHeader('Cache-Control','public, max-age=60');
-    res.json(output.collections);
-  }catch(e){handleBridgeError(res,e);}
-});
+app.get('/collections.json', (req, res) => handlePublishedCollections(res));
 
 // ==========================================================================
 // ROTAS PARAMÉTRICAS COM TOKEN OU ALIAS DE PERFIL (Retrocompatibilidade 100%)
 // ==========================================================================
 
-// Stremio: Manifest configurado via token ou perfil
 app.get('/:config/manifest.json', (req, res) => {
-  const config = resolveConfig(req.params.config);
-  res.json(generateManifest(req.params.config==='main'?effectiveConfig(config):config));
+  res.json(generateManifest(resolveScopedConfig(req.params.config)));
 });
 
-// Stremio: Stream endpoint
-app.get('/:config/stream/:type/:id.json', async (req, res) => {
-  const { config: rawConfig, type, id } = req.params;
-  const config = rawConfig==='main'?effectiveConfig(resolveConfig(rawConfig)):resolveConfig(rawConfig);
-
-  try {
-    const result = await aggregateStreams(config, type, id);
-    res.setHeader('Cache-Control', 'max-age=60, stale-while-revalidate=120');
-    res.json(result);
-  } catch (err) {
-    console.error('Erro ao agregar streams:', err);
-    res.status(500).json({ streams: [], error: err.message });
-  }
+app.get('/:config/stream/:type/:id.json', (req, res) => {
+  return handleStreamRequest(req, res, resolveScopedConfig(req.params.config));
 });
 
-// Stremio: Subtitles endpoint
-app.get(['/:config/subtitles/:type/:id.json', '/:config/subtitles/:type/:id/:extra.json'], async (req, res) => {
-  const { config: rawConfig, type, id, extra } = req.params;
-  const config = rawConfig==='main'?effectiveConfig(resolveConfig(rawConfig)):resolveConfig(rawConfig);
-
-  try {
-    const result = await aggregateSubtitles(config, type, id, extra || '');
-    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
-    res.json(result);
-  } catch (err) {
-    console.error('Erro ao agregar legendas:', err);
-    res.status(500).json({ subtitles: [], error: err.message });
-  }
+app.get(['/:config/subtitles/:type/:id.json', '/:config/subtitles/:type/:id/:extra.json'], (req, res) => {
+  return handleSubtitlesRequest(req, res, resolveScopedConfig(req.params.config));
 });
 
-// Stremio: Catalog endpoint
-app.get(['/:config/catalog/:type/:id.json', '/:config/catalog/:type/:id/:extra.json'], async (req, res) => {
-  const { config: rawConfig, type, id, extra } = req.params;
-  const config = rawConfig==='main'?effectiveConfig(resolveConfig(rawConfig)):resolveConfig(rawConfig);
-  const extraParam = resolveExtraParam(extra, req.query);
-
-  try {
-    const result = await fetchCatalog(config, type, id, extraParam);
-    res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
-    res.json(rawConfig==='main'?decorateCatalogResponse(result,type):result);
-  } catch (err) {
-    console.error('Erro ao consultar catálogo:', err);
-    res.status(500).json({ metas: [], error: err.message });
-  }
+app.get(['/:config/catalog/:type/:id.json', '/:config/catalog/:type/:id/:extra.json'], (req, res) => {
+  const isMain = req.params.config === 'main';
+  return handleCatalogRequest(req, res, resolveScopedConfig(req.params.config), { useMainBridge: false, decorate: isMain });
 });
 
-// Stremio: Meta endpoint
-app.get('/:config/meta/:type/:id.json', async (req, res) => {
-  const { config: rawConfig, type, id } = req.params;
-  const config = rawConfig==='main'?effectiveConfig(resolveConfig(rawConfig)):resolveConfig(rawConfig);
-
-  try {
-    const result = await fetchMeta(config, type, id);
-    res.setHeader('Cache-Control', 'max-age=3600, stale-while-revalidate=7200');
-    res.json(rawConfig==='main'?decorateMetaResponse(result,type):result);
-  } catch (err) {
-    console.error('Erro ao consultar metadados:', err);
-    res.status(500).json({ meta: null, error: err.message });
-  }
+app.get('/:config/meta/:type/:id.json', (req, res) => {
+  const isMain = req.params.config === 'main';
+  return handleMetaRequest(req, res, resolveScopedConfig(req.params.config), { useMainBridge: false, decorate: isMain });
 });
 
-// Nuvio Collections Endpoint com token ou perfil
 app.get('/:config/collections.json', (req, res) => {
-  const { config: rawConfig } = req.params;
-  const config = rawConfig==='main'?effectiveConfig(resolveConfig(rawConfig)):resolveConfig(rawConfig);
+  const config = resolveScopedConfig(req.params.config);
   res.setHeader('Cache-Control', 'max-age=300, stale-while-revalidate=600');
   res.json(config.nuvioCollections || []);
 });

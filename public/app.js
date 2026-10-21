@@ -47,6 +47,18 @@ function editableSources(f){
  }
  return f.catalogSources;
 }
+function paginateItems(items,page,pageSize){
+ const totalPages=Math.max(1,Math.ceil(items.length/pageSize));
+ const safePage=Math.max(0,Math.min(page,totalPages-1));
+ const offset=safePage*pageSize;
+ return {page:safePage,totalPages,offset,slice:items.slice(offset,offset+pageSize)};
+}
+function renderPagerButtons({page,totalPages,attr,summaryText='',prevLabel='← Anterior',nextLabel='Próxima →',includeMiddlePage=false}){
+ return '<span>'+summaryText+'</span><div>'+
+  '<button type="button" '+attr+'="-1" '+(page===0?'disabled':'')+'>'+prevLabel+'</button>'+
+  (includeMiddlePage?'<span>Página '+(page+1)+' de '+totalPages+'</span>':'')+
+  '<button type="button" '+attr+'="1" '+(page>=totalPages-1?'disabled':'')+'>'+nextLabel+'</button></div>';
+}
 function sourceKey(s){return [s.addonId,s.type,s.catalogId||s.catalog_id,s.genre||''].join('::');}
 function collectionResolver(){
  const ready=state.collectionInventory==='ready';
@@ -348,9 +360,9 @@ function catalogOrigin(c){
 function renderCatalogs(){
  const all=catalogs(),providers=state.providers,q=state.search.toLocaleLowerCase('pt-BR').trim();
  const matches=all.filter(c=>(c.name+' '+c.id+' '+catalogOrigin(c)+' '+c.type).toLocaleLowerCase('pt-BR').includes(q));
- const size=50,pages=Math.max(1,Math.ceil(matches.length/size));
- state.catalogPage=Math.min(state.catalogPage,pages-1);
- const first=state.catalogPage*size,part=matches.slice(first,first+size);
+ const paged=paginateItems(matches,state.catalogPage,50);
+ state.catalogPage=paged.page;
+ const pages=paged.totalPages,part=paged.slice;
  const mayReorder=state.editable&&!q&&!state.dirty&&!state.catalogBusy;
  const controls=(id,index)=>{
   const e=esc(id);
@@ -367,7 +379,7 @@ function renderCatalogs(){
   const sourceLabel=origin;
   return '<article class="hub-catalog-card" data-catalog-key="'+identity+'">'+
    '<details '+(expanded?'open':'')+'>'+
-    '<summary data-catalog-summary="'+identity+'" draggable="'+mayReorder+'">'+
+    '<summary data-catalog-summary="'+identity+'">'+
      '<span class="hub-catalog-drag" title="Arraste para mudar a prioridade" aria-hidden="true">⠿</span>'+
      '<span class="hub-catalog-rank">'+String(index+1).padStart(2,'0')+'</span>'+
      '<span class="hub-catalog-main"><b>'+esc(basicName)+'</b><small>'+esc(sourceLabel)+'</small></span>'+
@@ -472,8 +484,8 @@ function renderCollections(){
   <button class="folder-item ${f?.id===item.id?'active':''}" data-folder="${esc(item.id)}">
  <div class="folder-card"><span class="collection-folder-index" aria-hidden="true">${String(i+1).padStart(2,'0')}</span>${item.customCoverImageUrl||item.coverImageUrl?`<img class="cover-thumb ${item.tileShape==='POSTER'?'poster':''}" src="${esc(item.customCoverImageUrl||item.coverImageUrl)}" alt="" loading="lazy">`:
  '<div class="cover-thumb" style="display:grid;place-items:center">▣</div>'}
- <span><strong>${esc(item.title)}</strong><small>${(item.catalogSources||item.sources||[]).length} fontes · ${esc(item.tileShape||'LANDSCAPE')}</small></span>
- ${checked&&(item.catalogSources||item.sources||[]).some(src=>resolver.resolve(src).status==='missing')?'<span class="collection-folder-warning" title="Catálogos não localizados">!</span>':'<span class="collection-slot-chevron" aria-hidden="true">›</span>'}</div>
+ <span><strong>${esc(item.title)}</strong><small>${editableSources(item).length} fontes · ${esc(item.tileShape||'LANDSCAPE')}</small></span>
+ ${checked&&editableSources(item).some(src=>resolver.resolve(src).status==='missing')?'<span class="collection-folder-warning" title="Catálogos não localizados">!</span>':'<span class="collection-slot-chevron" aria-hidden="true">›</span>'}</div>
  </button></div>`).join('')||'<div class="empty"><b>Sem pastas ainda</b><span>Adicione uma pasta para reunir catálogos.</span></div>':
  '<div class="empty"><b>Selecione ou crie uma coleção</b></div>'}
  </div></div>`;
@@ -497,10 +509,10 @@ function renderCollections(){
  ${(f.customCoverImageUrl||f.coverImageUrl)?`<div class="art-preview" style="aspect-ratio:${f.tileShape==='POSTER'?'2/3':f.tileShape==='SQUARE'?'1':'16/9'}"><img src="${esc(f.customCoverImageUrl||f.coverImageUrl)}" alt="Capa da pasta"></div>`:''}</div>
  <div class="editor-section"><label class="field"><span>Proporção para Nuvio Legacy</span>
  ${select('folderShape',[['LANDSCAPE','Landscape · 16:9'],['POSTER','Poster · 2:3'],['SQUARE','Square · 1:1'],['PORTRAIT','Portrait · 3:4 (converte para Poster no Legacy)']],f.tileShape||'LANDSCAPE')}</label></div>
- <div class="editor-section"><div class="section-head"><h3>Catálogos da pasta</h3><span class="badge">${(f.catalogSources||f.sources||[]).length}</span></div>
+ <div class="editor-section"><div class="section-head"><h3>Catálogos da pasta</h3><span class="badge">${editableSources(f).length}</span></div>
  <p class="panel-sub">Arraste ⠿ para ordenar os catálogos (abas) nesta pasta. A posição será publicada depois de Salvar alterações.</p>
  <div class="collection-sources-sort" data-sort-list="source">
- ${(f.catalogSources||f.sources||[]).map((s,i)=>{
+ ${editableSources(f).map((s,i)=>{
   const match=resolver.resolve(s);
   const label=match.status==='ready'?'Reconhecido':match.status==='missing'?'Não localizado':'Verificando';
   return `<div class="source-row source-row-${match.status}" data-sort-level="source" data-sort-index="${i}" data-source-key="${esc(sourceKey(s))}">
@@ -514,7 +526,7 @@ function renderCollections(){
   <div class="tiny-actions">
    <button class="tiny-btn source-change-btn" data-source-replace="${i}" aria-label="Substituir catálogo" title="Escolher outra origem">Substituir</button>
    <button class="tiny-btn" data-source-move="${i}" data-delta="-1" aria-label="Subir" ${i===0||!state.editable?'disabled':''}>↑</button>
-   <button class="tiny-btn" data-source-move="${i}" data-delta="1" aria-label="Descer" ${i===(f.catalogSources||f.sources||[]).length-1||!state.editable?'disabled':''}>↓</button>
+   <button class="tiny-btn" data-source-move="${i}" data-delta="1" aria-label="Descer" ${i===editableSources(f).length-1||!state.editable?'disabled':''}>↓</button>
    <button class="tiny-btn" data-source-remove="${i}" aria-label="Remover">×</button>
   </div></div>`}).join('')||'<p class="muted">Esta pasta ainda não contém catálogos.</p>'}</div>
  <label class="field" style="margin-top:13px"><span>Adicionar catálogo da biblioteca</span>
@@ -998,10 +1010,9 @@ function replaceCollectionSource(index=null){
    (!q||(c.name+' '+c.provider+' '+c.catalog.id).toLocaleLowerCase('pt-BR').includes(q)));
  }
  function update(){
-  const items=matched(),pagesCount=Math.max(1,Math.ceil(items.length/pageSize));
-  page=Math.max(0,Math.min(page,pagesCount-1));
-  const slice=items.slice(page*pageSize,(page+1)*pageSize);
-  const offset=page*pageSize;
+  const items=matched(),paged=paginateItems(items,page,pageSize);
+  page=paged.page;
+  const {slice,offset,totalPages:pagesCount}=paged;
   rows.innerHTML=slice.map((c,i)=>
    '<button type="button" class="collection-repair-choice '+
     (selected?.key===c.key?'is-selected':'')+
@@ -1011,9 +1022,8 @@ function replaceCollectionSource(index=null){
      (c.from==='hub'?'Biblioteca do Hub':'Manifesto do addon')+'</small></button>').join('')||
    '<div class="inline-info warning">Nenhum catálogo desse tipo foi encontrado para os filtros selecionados.</div>';
   summary.textContent=items.length+' opções disponíveis · '+(selected?'Selecionado: '+selected.name:'Nenhum selecionado');
-  pages.innerHTML='<span>Página '+(page+1)+' de '+pagesCount+'</span><div>'+
-   '<button type="button" data-repair-page="-1" '+(page===0?'disabled':'')+'>Anterior</button>'+
-   '<button type="button" data-repair-page="1" '+(page===pagesCount-1?'disabled':'')+'>Próxima</button></div>';
+  pages.innerHTML=renderPagerButtons({page,totalPages:pagesCount,attr:'data-repair-page',
+   summaryText:'Página '+(page+1)+' de '+pagesCount,prevLabel:'Anterior',nextLabel:'Próxima'});
   submit.disabled=!selected;
   submit.textContent=selected?'Usar '+selected.name.slice(0,45):'Escolha um catálogo';
  }
@@ -1305,19 +1315,17 @@ async function createCatalog(existing=null){
   function update(){
    const match=items.filter(x=>(x.source.name+' '+x.provider.name+' '+x.source.id)
     .toLocaleLowerCase('pt-BR').includes(term));
-   const totalPages=Math.max(1,Math.ceil(match.length/perPage));
-   page=Math.min(page,totalPages-1);
-   results.innerHTML=match.slice(page*perPage,(page+1)*perPage).map(item=>
+   const paged=paginateItems(match,page,perPage);
+   page=paged.page;
+   results.innerHTML=paged.slice.map(item=>
     '<div class="addon-bulk-row"><span><strong>'+esc(item.source.name)+
     '</strong><small>'+esc(item.provider.name)+' · '+
     (item.source.type==='movie'?'Filme':'Série')+' · '+esc(item.source.id)+
     '</small></span></div>').join('')||
     '<p class="inline-info">Nenhum catálogo corresponde à pesquisa.</p>';
-   pages.innerHTML='<span>'+match.length+' catálogos · Página '+(page+1)+
-    ' de '+totalPages+'</span><div>'+
-    '<button type="button" data-review-page="-1" '+(page===0?'disabled':'')+
-    '>Anterior</button><button type="button" data-review-page="1" '+
-     (page>=totalPages-1?'disabled':'')+'>Próxima</button></div>';
+   pages.innerHTML=renderPagerButtons({page,totalPages:paged.totalPages,attr:'data-review-page',
+    summaryText:match.length+' catálogos · Página '+(page+1)+' de '+paged.totalPages,
+    prevLabel:'Anterior',nextLabel:'Próxima'});
   }
   search.oninput=e=>{e.stopPropagation();term=search.value.trim().toLocaleLowerCase('pt-BR');page=0;update();};
   pages.onclick=e=>{e.stopPropagation();
@@ -1717,9 +1725,9 @@ async function createCatalog(existing=null){
    '<span class="builder-preview-placeholder" aria-label="Capa indisponível">▤</span>';
   function update(){
    const selected=filtered(),pageSize=mode==='grid'?24:30,
-    totalPages=Math.max(1,Math.ceil(selected.length/pageSize));
-   page=Math.min(page,totalPages-1);
-   const shown=selected.slice(page*pageSize,(page+1)*pageSize);
+    paged=paginateItems(selected,page,pageSize);
+   page=paged.page;
+   const shown=paged.slice,totalPages=paged.totalPages;
    out.className=mode==='grid'?'builder-preview-grid':'builder-preview-table';
    out.innerHTML=shown.map(item=>mode==='grid'?
     '<div class="builder-preview-card">'+poster(item)+
@@ -1730,13 +1738,12 @@ async function createCatalog(existing=null){
      '<div><strong>'+esc(item.name)+'</strong><small>'+esc(item.year||'Ano desconhecido')+
      ' · '+esc(item.id)+'</small></div><span class="builder-media-tag">'+typeLabel(item)+'</span></div>').join('')||
     '<div class="inline-info">Nenhum título corresponde à pesquisa. A lista importada não foi alterada.</div>';
-   pages.innerHTML='<span>Exibindo '+(selected.length?page*pageSize+1:0)+'–'+
-    Math.min((page+1)*pageSize,selected.length)+' de '+selected.length+' títulos'+
-    (selected.length!==all.length?' (filtrados de '+all.length+')':'')+'</span>'+
-    '<div><button type="button" data-preview-page="-1" '+(page===0?'disabled':'')+
-    '>Anterior</button><span>Página '+(page+1)+' de '+totalPages+'</span>'+
-    '<button type="button" data-preview-page="1" '+(page>=totalPages-1?'disabled':'')+
-    '>Próxima</button></div>';
+   pages.innerHTML=renderPagerButtons({
+    page,totalPages,attr:'data-preview-page',prevLabel:'Anterior',nextLabel:'Próxima',includeMiddlePage:true,
+    summaryText:'Exibindo '+(selected.length?page*pageSize+1:0)+'–'+
+     Math.min((page+1)*pageSize,selected.length)+' de '+selected.length+' títulos'+
+     (selected.length!==all.length?' (filtrados de '+all.length+')':'')
+   });
   }
   function stop(e){e.stopPropagation();}
   search.addEventListener('input',e=>{stop(e);term=search.value.trim().toLocaleLowerCase('pt-BR');page=0;update();});
@@ -2017,9 +2024,9 @@ function mountAddonCatalogPicker(root,{selected,onChange,providerUrl='',readonly
  function update(){
   root.querySelector('[data-bulk-action="select-all"]').textContent=
    provider.value?'Selecionar todos deste addon':'Selecionar todos os addons';
-  const matches=matched(),totalPages=Math.max(1,Math.ceil(matches.length/pageSize));
-  page=Math.min(page,totalPages-1);
-  const slice=matches.slice(page*pageSize,(page+1)*pageSize);
+  const matches=matched(),paged=paginateItems(matches,page,pageSize);
+  page=paged.page;
+  const slice=paged.slice,totalPages=paged.totalPages;
   const chosen=rows.filter(x=>selected.has(x.key));
   summary.textContent=chosen.length+' selecionados · '+
    chosen.filter(x=>x.source.type==='movie').length+' filmes · '+
@@ -2035,9 +2042,8 @@ function mountAddonCatalogPicker(root,{selected,onChange,providerUrl='',readonly
       ' · '+esc(x.source.id)+'</small></span>'+
     (x.existing?'<span class="addon-bulk-tag">Já incluído</span>':'')+
     '</label>').join('')||'<p class="inline-info">Nenhum catálogo corresponde aos filtros.</p>';
-  pages.innerHTML='<span>Página '+(page+1)+' de '+totalPages+'</span><div>'+
-   '<button type="button" data-bulk-page="-1" '+(page===0?'disabled':'')+'>← Anterior</button>'+
-   '<button type="button" data-bulk-page="1" '+(page>=totalPages-1?'disabled':'')+'>Próxima →</button></div>';
+  pages.innerHTML=renderPagerButtons({page,totalPages,attr:'data-bulk-page',
+   summaryText:'Página '+(page+1)+' de '+totalPages});
   onChange?.(chosen);
  }
  for(const field of [provider,type,search]){
@@ -2504,7 +2510,6 @@ $('app').addEventListener('pointerup',event=>{
  if(moving)event.preventDefault();
 });
 $('app').addEventListener('pointercancel',cleanupCatalogPointer);
-let draggedCatalog=null;
 let draggedAddon=null;
 function clearAddonDragFeedback(){
  document.querySelectorAll('.addon-mini.is-dragging,.addon-mini.is-drop-target')
@@ -2516,16 +2521,6 @@ $('app').addEventListener('error',event=>{
  if(img instanceof HTMLImageElement && img.closest('.addon-mini-avatar'))img.hidden=true;
 },true);
 $('app').addEventListener('dragstart',event=>{
- const catalogSummary=event.target.closest('.hub-catalog-card summary');
- if(catalogSummary){
-  if(!catalogSummary.draggable||state.catalogBusy){event.preventDefault();return;}
-  draggedCatalog=catalogSummary.closest('.hub-catalog-card')?.dataset.catalogKey||null;
-  if(!draggedCatalog)return;
-  event.dataTransfer.effectAllowed='move';
-  event.dataTransfer.setData('text/plain',draggedCatalog);
-  catalogSummary.closest('.hub-catalog-card').classList.add('is-dragging');
-  return;
- }
  // Só o cabeçalho compacto é arrastável. Os detalhes expandidos não devem
  // interferir nos botões de configuração, ativação ou prioridade.
  const summary=event.target.closest('.addon-mini summary[data-addon-summary]');
@@ -2540,14 +2535,6 @@ $('app').addEventListener('dragstart',event=>{
  card.classList.add('is-dragging');
 });
 $('app').addEventListener('dragover',event=>{
- if(draggedCatalog){
-  const row=event.target.closest('.hub-catalog-card');
-  if(!row)return;
-  event.preventDefault();event.dataTransfer.dropEffect='move';
-  document.querySelectorAll('.hub-catalog-card.is-drop-target').forEach(e=>e.classList.remove('is-drop-target'));
-  if(row.dataset.catalogKey!==draggedCatalog)row.classList.add('is-drop-target');
-  return;
- }
  if(!draggedAddon)return;
  const card=event.target.closest('.addon-mini[data-addon-url]');
  if(!card)return;
@@ -2559,16 +2546,6 @@ $('app').addEventListener('dragover',event=>{
   card.classList.add('is-drop-target');
 });
 $('app').addEventListener('drop',event=>{
- if(draggedCatalog){
-  const row=event.target.closest('.hub-catalog-card');
-  if(!row)return;
-  event.preventDefault();
-  const src=draggedCatalog,dst=row.dataset.catalogKey;
-  draggedCatalog=null;
-  document.querySelectorAll('.hub-catalog-card.is-dragging,.hub-catalog-card.is-drop-target')
-   .forEach(e=>e.classList.remove('is-dragging','is-drop-target'));
-  moveCatalogTo(src,dst);return;
- }
  const card=event.target.closest('.addon-mini[data-addon-url]');
  if(!card||!draggedAddon)return;
  event.preventDefault();
@@ -2579,9 +2556,6 @@ $('app').addEventListener('drop',event=>{
  priorityDragTo(src,dst);
 });
 $('app').addEventListener('dragend',()=>{
- draggedCatalog=null;
- document.querySelectorAll('.hub-catalog-card.is-dragging,.hub-catalog-card.is-drop-target')
-  .forEach(e=>e.classList.remove('is-dragging','is-drop-target'));
  draggedAddon=null;
  clearAddonDragFeedback();
 });

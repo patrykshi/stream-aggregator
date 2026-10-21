@@ -1,19 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { resolveDataDir, readJsonFile, writeAtomicJsonFile } from '../config/json-store.js';
 
-const DATA=process.env.DATA_DIR||path.resolve('data');
+const DATA=resolveDataDir();
 const FILE=path.join(DATA,'studio-import.json');
 const BACKUPS=path.join(DATA,'studio-import-backups');
 const MAX_BYTES=32*1024*1024;
 const validId=id=>typeof id==='string'&&id.length>0&&id.length<200&&!/[<>\x00-\x1f]/.test(id);
-function read(pathname,defaultValue=null){try{return JSON.parse(fs.readFileSync(pathname,'utf8'));}catch{return defaultValue;}}
-function write(file,data){
-  fs.mkdirSync(path.dirname(file),{recursive:true});
-  const tmp=file+'.'+process.pid+'.tmp';
-  fs.writeFileSync(tmp,JSON.stringify(data,null,2)+'\n',{mode:0o600});
-  fs.renameSync(tmp,file);
-}
+const read=(pathname,defaultValue=null)=>readJsonFile(pathname,defaultValue);
+const write=(file,data)=>writeAtomicJsonFile(file,data);
 function normalizedCatalog(raw,allowEmpty=false){
   const value=typeof raw==='string'?JSON.parse(raw):raw;
   const catalogs=Array.isArray(value)?value:value?.catalogs;

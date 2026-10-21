@@ -1,8 +1,8 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { resolveDataDir, readJsonFile, writeAtomicJsonFile, validatePublicHttpsUrl } from '../config/json-store.js';
 
-const DATA = process.env.DATA_DIR || path.resolve('data');
+const DATA = resolveDataDir();
 const FILE = path.join(DATA, 'hub-overlays.json');
 const HISTORY = path.join(DATA, 'hub-overlays-history.json');
 const UPSTREAM = path.join(DATA, 'hub-import-events.json');
@@ -16,13 +16,8 @@ const ENUMS = { viewMode:['TABBED_GRID','GRID','ROW'], tileShape:['LANDSCAPE','P
 const idOK = id => typeof id === 'string' && /^[\w-]{1,125}$/.test(id);
 const hash = o => crypto.createHash('sha256').update(JSON.stringify(o)).digest('hex');
 const defaults = () => ({ revision:0, updatedAt:null, groups:{}, folders:{}, addedGroups:[], addedFolders:{}, sourceAdds:{}, sourceHides:{}, sourceOrder:{}, catalogAddons:[], groupOrder:[], folderOrder:{} });
-function read(file,fallback) { try { return JSON.parse(fs.readFileSync(file,'utf8')); } catch { return fallback; } }
-function write(file,obj) {
-  fs.mkdirSync(DATA,{recursive:true});
-  const tmp=file+'.'+process.pid+'.tmp';
-  fs.writeFileSync(tmp,JSON.stringify(obj,null,2)+'\n',{mode:0o600});
-  fs.renameSync(tmp,file);
-}
+const read = (file, fallback) => readJsonFile(file, fallback);
+const write = (file, obj) => writeAtomicJsonFile(file, obj);
 function validatedPatch(raw, fields) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw Error('Personalização inválida');
   const patch={};
@@ -120,16 +115,13 @@ export function validateStudioDocument(doc) {
   const addonURLs=new Set();
   for(const item of included) {
     if(!item || typeof item.url!=='string'||item.url.length>1500)throw Error('URL de addon inválida');
-    const url=new URL(item.url);
-    if(url.protocol!=='https:'||url.username||url.password||url.port||!url.hostname.includes('.')||
-      url.hostname==='localhost'||url.hostname.endsWith('.local')||
-      /^\d+\.\d+\.\d+\.\d+$/.test(url.hostname)||url.hostname.includes(':')||
-      addonURLs.has(url.toString()))throw Error('URL de addon inválida ou duplicada');
-    addonURLs.add(url.toString());
+    const urlStr = validatePublicHttpsUrl(item.url, 'URL de addon inválida ou duplicada');
+    if(addonURLs.has(urlStr))throw Error('URL de addon inválida ou duplicada');
+    addonURLs.add(urlStr);
     if(!Array.isArray(item.selected)||item.selected.length>10000||
       item.selected.some(x=>typeof x!=='string'||!/^(movie|series|anime|other)::.{1,220}$/.test(x)))
       throw Error('Seleção de catálogos inválida');
-    normalized.catalogAddons.push({url:url.toString(),selected:[...new Set(item.selected)]});
+    normalized.catalogAddons.push({url:urlStr,selected:[...new Set(item.selected)]});
   }
   normalized.groupOrder=validateOrder(doc.groupOrder||[]);
   if(doc.folderOrder && (typeof doc.folderOrder!=='object'||Array.isArray(doc.folderOrder)))throw Error('Ordem de pastas inválida');

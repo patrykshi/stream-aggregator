@@ -1,11 +1,11 @@
-import fs from 'node:fs';
 import path from 'node:path';
+import { resolveDataDir, readJsonFile, writeAtomicJsonFile } from '../config/json-store.js';
 import { BRIDGE_ADDON_ID, catalogKey, previewExternalAddon } from './catalog-service.js';
 import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './url-helper.js';
 import {collectCatalogPages} from './catalog-pages.js';
 import { loadStudioImport } from './studio-import.js';
 
-const DATA = process.env.DATA_DIR || path.resolve('data');
+const DATA = resolveDataDir();
 const PROVIDERS = path.join(DATA, 'nuvio-publication-providers.json');
 const TTL = 10 * 60_000;
 const CATALOG_CACHE_TTL = 10 * 60_000;
@@ -16,16 +16,11 @@ const manifests = new Map();
 const catalogItemCache = new Map();
 
 function readProviders() {
-  try {
-    const data = JSON.parse(fs.readFileSync(PROVIDERS, 'utf8'));
-    return Array.isArray(data) ? data : [];
-  } catch { return []; }
+  const data = readJsonFile(PROVIDERS, []);
+  return Array.isArray(data) ? data : [];
 }
 function writeProviders(data) {
-  fs.mkdirSync(DATA, { recursive: true });
-  const temp = PROVIDERS + '.' + process.pid + '.tmp';
-  fs.writeFileSync(temp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
-  fs.renameSync(temp, PROVIDERS);
+  writeAtomicJsonFile(PROVIDERS, data);
 }
 export function listPublicationProviders() {
   return readProviders().map(({ addonId, name, url }) => ({ addonId, name, url }));
@@ -293,15 +288,21 @@ export async function publishedCatalog(type, id, extra, publication, { fetchImpl
   return result;
 }
 
+export function localMetadata(type, id) {
+  const manual = loadStudioImport()?.manifest?.catalogs || [];
+  for (const catalog of manual) {
+    if (!catalog.manual || catalog.type !== type) continue;
+    const meta = (catalog.metas || []).find(item => item.id === id);
+    if (meta) return { meta: { ...meta, type } };
+  }
+  return null;
+}
+
 export async function publishedMeta(type, id, publication) {
   // Catálogos criados diretamente no Hub já possuem metadados suficientes
   // para o Nuvio abrir a ficha básica, mesmo sem provedor metadata externo.
-  const manual=loadStudioImport()?.manifest?.catalogs||[];
-  for(const catalog of manual){
-    if(catalog.manual!==true || catalog.type!==type)continue;
-    const meta=(catalog.metas||[]).find(item=>item.id===id);
-    if(meta)return {meta:{...meta,type}};
-  }
+  const local = localMetadata(type, id);
+  if (local) return local;
   for (const provider of publication.metaProviders || []) {
     const parsed = parseAddonUrl(provider.url);
     if (!parsed) continue;

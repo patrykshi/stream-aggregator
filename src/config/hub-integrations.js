@@ -1,10 +1,12 @@
 // Credenciais do Nuvio Hub: persistência local, sem envio de segredos ao navegador.
-import fs from 'node:fs';
 import path from 'node:path';
-const DIR=process.env.DATA_DIR||path.resolve('data');
+import { resolveDataDir, readJsonFile, writeAtomicJsonFile } from './json-store.js';
+const DIR=resolveDataDir();
 const FILE=path.join(DIR,'hub-integrations.json');
 const KEYS={tmdb:'TMDB_API_KEY',trakt:'TRAKT_CLIENT_ID',mdblist:'MDBLIST_API_KEY'};
-function read(){try{const v=JSON.parse(fs.readFileSync(FILE,'utf8'));return v&&typeof v==='object'?v:{};}catch(e){if(e.code==='ENOENT')return {};throw Error('Não foi possível ler a configuração das integrações.');}}
+function read(){
+ return readJsonFile(FILE,{},{strict:true,requireObject:true,errorMessage:'Não foi possível ler a configuração das integrações.'});
+}
 export function getIntegrationKey(provider){
  const env=KEYS[provider];
  if(!env)throw Error('Integração desconhecida.');
@@ -35,12 +37,6 @@ export function updateIntegrationSettings(input){
    throw Error('A chave deve ter 8 a 512 caracteres, sem espaços ou controles.');
   next[provider]=secret;
  }
- fs.mkdirSync(DIR,{recursive:true,mode:0o700});
- const temp=FILE+'.'+process.pid+'.tmp';
- try{
-  fs.writeFileSync(temp,JSON.stringify(next,null,2)+'\n',{mode:0o600,flag:'wx'});
-  fs.renameSync(temp,FILE);
-  fs.chmodSync(FILE,0o600);
- }finally{try{fs.unlinkSync(temp);}catch{}}
+ writeAtomicJsonFile(FILE,next);
  return integrationStatuses();
 }

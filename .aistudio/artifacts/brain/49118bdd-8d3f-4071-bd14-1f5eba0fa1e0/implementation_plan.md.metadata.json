@@ -1,0 +1,6 @@
+{
+  "summary":  "Plano arquitetural e de refatoracao para eliminacao de redundancias no backend e no frontend do Nuvio Hub (Stream Aggregator), mantendo 100% de compatibilidade com a suite de testes e o protocolo Stremio v2.",
+  "updatedAt":  "2026-10-21T20:16:49.702908749Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

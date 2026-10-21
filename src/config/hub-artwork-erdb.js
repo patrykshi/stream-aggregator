@@ -1,9 +1,9 @@
 // Configuração local e privada do renderer ERDB.
 // Não gravar o token na biblioteca, perfis de addons ou payloads GET.
-import fs from 'node:fs';
 import path from 'node:path';
+import { resolveDataDir, readJsonFile, writeAtomicJsonFile } from './json-store.js';
 
-const DATA=process.env.DATA_DIR||path.resolve('data');
+const DATA=resolveDataDir();
 const FILE=path.join(DATA,'hub-artwork-erdb.json');
 export const DEFAULT_ERDB_BASE='https://easyratingsdb.com';
 const CATEGORIES=['poster','backdrop','logo','thumbnail'];
@@ -11,15 +11,8 @@ const DEFAULTS=Object.freeze({enabled:false,baseUrl:DEFAULT_ERDB_BASE,
  poster:true,backdrop:false,logo:false,thumbnail:false,token:''});
 
 function read(){
- try {
-  const value=JSON.parse(fs.readFileSync(FILE,'utf8'));
-  if(!value||typeof value!=='object'||Array.isArray(value))
-   throw Error('Configuração do ERDB inválida.');
-  return {...DEFAULTS,...value};
- }catch(e){
-  if(e.code==='ENOENT')return {...DEFAULTS};
-  throw Error('Não foi possível ler a configuração privada de capas.');
- }
+ const value=readJsonFile(FILE,null,{strict:true,requireObject:true,errorMessage:'Não foi possível ler a configuração privada de capas.'});
+ return value?{...DEFAULTS,...value}:{...DEFAULTS};
 }
 function normalizeBaseUrl(input){
  if(typeof input!=='string')throw Error('Endereço ERDB inválido.');
@@ -72,12 +65,6 @@ export function saveErdbSettings(body){
  }
  if(next.enabled&&!next.token)throw Error('Configure o token ERDB antes de ativar as capas.');
  if(next.enabled&&!CATEGORIES.some(x=>next[x]))throw Error('Escolha pelo menos um tipo de imagem.');
- fs.mkdirSync(DATA,{recursive:true,mode:0o700});
- const temp=FILE+'.'+process.pid+'.'+Date.now()+'.tmp';
- try{
-  fs.writeFileSync(temp,JSON.stringify(next,null,2)+'\n',{mode:0o600,flag:'wx'});
-  fs.renameSync(temp,FILE);
-  fs.chmodSync(FILE,0o600);
- }finally{try{fs.unlinkSync(temp);}catch{}}
+ writeAtomicJsonFile(FILE,next);
  return erdbStatus();
 }

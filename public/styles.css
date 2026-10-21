@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap');
-:root{color-scheme:dark;font-family:'DM Sans',system-ui,sans-serif;--bg:#090e18;--surface:#111b2b;--card:#141f31;--card2:#172438;--hover:#21314a;--line:#25374e;--txt:#edf4ff;--muted:#91a3bb;--soft:#71869e;--accent:#81d3f5;--accentdark:#142e42;--teal:#4bceb7;--danger:#ee8e99;--radius:14px}
+:root{color-scheme:dark;font-family:'DM Sans',system-ui,sans-serif;--bg:#090d15;--surface:#121b29;--card:#172334;--card2:#1a293b;--hover:#24364d;--line:#29384b;--txt:#f1f6fc;--muted:#9cabbd;--soft:#768da4;--accent:#9dd9fa;--accentdark:#1c3449;--teal:#64d3ad;--danger:#fb9eac;--radius:16px}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);font-size:13px}
 button,input,select,textarea{font:inherit}
@@ -165,39 +165,10 @@ td small{display:block;color:#96aabb;margin-top:4px}
 .addon-search{min-width:240px;max-width:390px;flex:1}
 .addon-order-notice{font-size:11px;color:#a4bdd2;margin:0 0 16px;padding:11px 13px;border-radius:8px;background:#132a3e;border-left:3px solid #74c3e9}
 .addon-priority-list{display:grid;gap:12px}
-.addon-priority-card{display:grid;grid-template-columns:25px 69px minmax(0,1fr) auto auto;align-items:center;gap:14px;min-width:0;padding:16px 18px;border-radius:13px;background:linear-gradient(115deg,#182b40,#132235);border:1px solid #32526a;position:relative;overflow:hidden}
-.addon-priority-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#55c6a9}
-.addon-priority-card.is-disabled{background:#171c29;border-color:#554050}
-.addon-priority-card.is-disabled::before{background:#c88699}
-.addon-priority-card.is-disabled .addon-details{opacity:.65}
-.addon-priority-card.is-dragging{opacity:.55;border:1px dashed #8fcae8}
-.addon-priority-card:hover{border-color:#688baa}
-.addon-priority-card.is-disabled:hover{border-color:#b58196}
-.addon-drag{font-size:24px;color:#8aacc7;cursor:grab;line-height:1;user-select:none;text-align:center}
-.addon-priority-card[draggable=false] .addon-drag{opacity:.32;cursor:default}
-.addon-number{width:65px;min-height:63px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:10px;border:1px solid #437b8b;background:#173947}
-.addon-number strong{font:800 25px/1 Manrope,sans-serif;color:#b3ecfa}
-.addon-number small{font-size:8px;font-weight:800;color:#91c7d9;letter-spacing:.07em}
-.addon-number.off{background:#332732;border-color:#765368}
-.addon-number.off strong{color:#e9aebc}
-.addon-number.off small{color:#e4a0b3}
-.addon-details{min-width:0}
-.addon-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:7px}
-.addon-heading h3{font:800 16px/1.35 Manrope,sans-serif;color:#edf7ff;overflow-wrap:anywhere;margin:0}
-.addon-state{display:inline-flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.06em;font-weight:850;border-radius:8px;border:1px solid transparent;padding:7px 10px}
-.addon-state i{height:9px;width:9px;border-radius:50%;display:inline-block}
-.addon-state.is-on{background:#123b32;border-color:#347963;color:#a9f6d7}
-.addon-state.is-on i{background:#6cf3b6;box-shadow:0 0 0 3px #74e9bd22}
-.addon-state.is-off{background:#502a37;border-color:#a15771;color:#ffd8e0}
-.addon-state.is-off i{background:#ff899f}
-.addon-address{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;color:#a5b7cb;font-size:11px}
-.addon-resources{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
-.addon-priority-controls{display:flex;align-items:center;gap:5px}
 .addon-arrow,.addon-first{border:1px solid #456079;background:#1e354b;color:#e1efff;border-radius:8px;min-width:35px;min-height:36px;font-weight:800}
 .addon-arrow{font-size:17px}
 .addon-first{font-size:11px;padding:0 10px}
 .addon-arrow:hover:not(:disabled),.addon-first:hover:not(:disabled){background:#305577}
-.addon-main-actions{display:flex;flex-direction:column;gap:7px;align-items:stretch;min-width:141px}
 .addon-switch{min-height:41px;padding:7px 12px;text-align:center;border-radius:9px;font-weight:800;font-size:11px}
 .addon-switch.switch-on{background:#274337;border:1px solid #54856f;color:#c7ffdf}
 .addon-switch.switch-off{background:#753447;border:1px solid #c17891;color:#fff0f4}
@@ -206,32 +177,12 @@ td small{display:block;color:#96aabb;margin-top:4px}
 .addon-remove{border:0;background:transparent;color:#b8a3b5;text-decoration:underline;text-underline-offset:3px;padding:5px;font-size:11px}
 .addon-remove:hover{color:#ffe1e7}
 .addon-footnote{font-size:11px;line-height:1.7;color:#9fb6c7;margin:18px 2px 2px}
-@media(max-width:1250px){.addon-priority-card{grid-template-columns:24px 64px minmax(0,1fr) 146px;gap:10px}.addon-priority-controls{grid-column:4;grid-row:1}.addon-main-actions{grid-column:4;grid-row:2;flex-direction:row;justify-content:flex-end}.addon-details{grid-row:1/3;grid-column:3}.addon-number{grid-row:1/3}.addon-drag{grid-row:1/3}}
-@media(max-width:970px){.addon-priority-card{grid-template-columns:20px 60px minmax(0,1fr);gap:10px}.addon-details{grid-column:3;grid-row:1}.addon-priority-controls{grid-column:2;grid-row:2;justify-content:flex-start}.addon-main-actions{grid-column:3;grid-row:2;justify-content:flex-start}.addon-number{grid-row:1}.addon-drag{grid-row:1}.addon-main-actions{min-width:0}.addon-switch{min-width:130px}}
-@media(max-width:650px){.addons-summary{gap:7px}.addon-metric{padding:14px}.addon-metric strong{font-size:24px}.addon-metric span{font-size:10px}.addon-panel{padding:13px}.addon-controls{align-items:stretch}.addon-search{min-width:100%;max-width:100%}.addon-filters{width:100%;justify-content:center}.addon-filter{flex:1;justify-content:center;font-size:11px;padding:6px}.addon-priority-card{grid-template-columns:20px 58px minmax(0,1fr);padding:12px;gap:8px}.addon-details{grid-column:3;grid-row:1}.addon-heading{gap:6px}.addon-heading h3{font-size:13px}.addon-state{font-size:9px;padding:5px 6px}.addon-number{width:55px;min-height:56px}.addon-number strong{font-size:20px}.addon-priority-controls{grid-column:2/4;grid-row:2}.addon-main-actions{grid-column:2/4;grid-row:3;align-items:center}.addon-main-actions .addon-switch{flex:1}.addon-remove{font-size:10px}}
+@media(max-width:650px){.addons-summary{gap:7px}.addon-metric{padding:14px}.addon-metric strong{font-size:24px}.addon-metric span{font-size:10px}.addon-panel{padding:13px}.addon-controls{align-items:stretch}.addon-search{min-width:100%;max-width:100%}.addon-filters{width:100%;justify-content:center}.addon-filter{flex:1;justify-content:center;font-size:11px;padding:6px}.addon-remove{font-size:10px}}
 
 /* Monitoramento e configuração por addon — origens externas */
 .addon-monitor-toolbar{background:#10283a;border:1px solid #31566b;border-radius:10px;padding:12px 15px;display:flex;justify-content:space-between;align-items:center;gap:12px;margin:15px 0}
 .addon-monitor-toolbar span{font-size:11px;color:#b0cadd;line-height:1.6;flex:1}
 .addon-monitor-toolbar b{color:#e3f2ff}
-.addon-priority-card{grid-template-columns:25px 69px minmax(0,1fr) auto auto;align-items:start}
-.addon-details{align-self:stretch}
-.addon-health-block{border-top:1px solid #334960;margin-top:14px;padding-top:12px;display:grid;gap:10px}
-.addon-origin{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.addon-origin strong{padding:6px 10px;border-radius:7px;font-size:10px;letter-spacing:.04em;border:1px solid}
-.addon-origin span{font-size:11px;color:#bacbdb}
-.addon-origin.origin-online strong{background:#194234;border-color:#397e64;color:#b5f9d4}
-.addon-origin.origin-offline strong{background:#532c36;border-color:#a05c70;color:#ffd3da}
-.addon-origin.origin-warning strong{background:#4d3f22;border-color:#9a8250;color:#ffe4aa}
-.addon-origin.origin-pending strong{background:#29394b;border-color:#60758a;color:#d3dfef}
-.addon-health-metrics{display:flex;gap:10px;flex-wrap:wrap}
-.addon-health-metrics span{padding:6px 13px 7px;background:#0f2132;border:1px solid #293f52;border-radius:8px;min-width:122px;display:grid;gap:4px}
-.addon-health-metrics b{font:800 14px Manrope;color:#d8f1ff}
-.addon-health-metrics small{font-size:10px;color:#9eb5c8}
-.addon-health-date{font-size:10px;color:#b1c0cc;margin:0}
-.addon-origin-caps{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.addon-origin-caps>small{font-size:10px;color:#acbdca;margin-right:4px}
-.addon-main-actions{min-width:142px}
 .addon-settings{background:#284660;border:1px solid #6594b3;color:#ecf8ff;min-height:36px;border-radius:8px;font-size:11px;font-weight:800}
 .addon-settings:hover:not(:disabled){background:#375e7a}
 .addon-resource-fieldset{border:1px solid #37566e;padding:13px 14px;display:grid;gap:8px;border-radius:10px;min-width:0}
@@ -242,9 +193,7 @@ td small{display:block;color:#96aabb;margin-top:4px}
 .addon-resource-choice b{font-size:12px}
 .addon-resource-choice small{font-size:10px;color:#adc5d5}
 .addon-include{margin-top:2px}
-@media(max-width:1250px){.addon-priority-card{grid-template-columns:24px 64px minmax(0,1fr) 146px;gap:10px}}
-@media(max-width:970px){.addon-priority-card{grid-template-columns:20px 60px minmax(0,1fr);gap:10px}}
-@media(max-width:650px){.addon-monitor-toolbar{flex-wrap:wrap}.addon-monitor-toolbar .btn{width:100%}.addon-health-metrics span{flex:1;min-width:105px}.addon-health-block{margin-top:10px}}
+@media(max-width:650px){.addon-monitor-toolbar{flex-wrap:wrap}.addon-monitor-toolbar .btn{width:100%}}
 
 /* Addons: linhas condensadas e detalhes sob demanda */
 .addon-summary-four{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -687,43 +636,13 @@ td small{display:block;color:#96aabb;margin-top:4px}
  .collection-repair-controls{grid-template-columns:1fr}
  .collection-health-counts{gap:6px}.collection-health-counts span{padding:7px;font-size:10px}}
 
-/* Ordenação por arrastar: Coleções, pastas e catálogos; gesto independente dos botões */
-.collection-sort-hint{font-size:10px;line-height:1.45;margin:0 0 9px}
-.collection-sort-item{display:flex;align-items:stretch;gap:5px;min-width:0;position:relative;
- border-radius:10px;transition:background .15s}
-.collection-sort-item>.collection-item,.collection-sort-item>.folder-item{flex:1;min-width:0;width:auto}
-.collection-sort-handle{display:flex;align-items:center;justify-content:center;flex:0 0 27px;
- align-self:stretch;min-height:35px;padding:2px 4px;border:1px solid #395d73;border-radius:8px;
- color:#89cce4;background:#172b40;font-size:19px;font-weight:700;cursor:grab;
- user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:contain;
- -webkit-tap-highlight-color:transparent}
-.collection-sort-handle:active{cursor:grabbing}
-.collection-sort-handle:focus-visible{outline:2px solid #8ce5fb;outline-offset:2px}
-.collection-sort-handle[aria-disabled=true]{cursor:not-allowed;opacity:.4}
-.collection-sort-item.is-dragging,.source-row.is-dragging{opacity:.66;outline:1px dashed #8bdff6;
- box-shadow:0 0 0 2px #7bc6ea19;background:#1b3c4e}
-.collection-sort-item.is-drop-before,.source-row.is-drop-before{
- box-shadow:inset 0 3px 0 #80daf7}
-.collection-sort-item.is-drop-after,.source-row.is-drop-after{
- box-shadow:inset 0 -3px 0 #80daf7}
-.collection-sources-sort{display:grid;gap:6px}
-.collection-sources-sort .source-row{margin-bottom:0;gap:8px}
-.collection-sources-sort .source-row .collection-sort-handle{min-height:55px;flex:0 0 25px}
-.collection-sources-sort .source-row .tiny-actions{max-width:118px}
-.collection-sort-item .collection-item.active,.collection-sort-item .folder-item.active{
- background:#1c3b52;border-color:#4386a7}
-@media(max-width:600px){
- .collection-sort-item{gap:5px}
- .collection-sort-handle{flex-basis:29px;min-height:42px;font-size:19px}
- .collection-sources-sort .source-row .collection-sort-handle{min-height:64px;flex-basis:28px}
- .collection-sources-sort .source-row .source-text{flex:1 1 160px}
- .collection-sources-sort .source-row .tiny-actions{margin-left:33px;max-width:none}
-}
-
 /* Coleções: mesmo cartão compacto/integrado de Addons e Catálogos.
    A alça pertence ao slot; nada de duas caixas visuais separadas. */
 .collection-list,.folder-list{gap:9px}
-.collection-sort-hint{margin:0 0 11px;line-height:1.55;color:#a9c4d5}
+.collection-sort-hint{font-size:10px;margin:0 0 11px;line-height:1.55;color:#a9c4d5}
+.collection-sort-handle:active{cursor:grabbing}
+.collection-sort-handle[aria-disabled=true]{cursor:not-allowed;opacity:.4}
+.collection-sources-sort{display:grid;gap:9px}
 .collection-sort-item{
  display:grid;grid-template-columns:24px minmax(0,1fr);align-items:stretch;gap:0;
  position:relative;min-width:0;padding:0 5px 0 10px;min-height:57px;
@@ -858,179 +777,11 @@ td small{display:block;color:#96aabb;margin-top:4px}
  .collection-sources-sort .source-row .tiny-actions{margin:5px 0 0!important;max-width:none!important}
 }
 
-/* Simulador do Nuvio — canvas TV/celular e auditoria, sempre somente leitura. */
-.nuvio-preview-root{display:grid;gap:14px;min-width:0}
-.nuvio-preview-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:13px 16px;
- background:#111f30;border:1px solid #375269;border-radius:14px}
-.nuvio-preview-toolbar-title{flex:1;min-width:190px;display:grid;gap:4px}
-.nuvio-preview-toolbar-title strong{font:800 17px Manrope,sans-serif;color:#e7faff}
-.nuvio-preview-toolbar-title small{color:#a8c9d7;font-size:11px}
-.nuvio-preview-toolbar-controls{display:flex;gap:5px;flex-wrap:wrap;background:#0b1b2a;border-radius:10px;padding:4px}
-.nuvio-preview-toolbar-controls button{border:0;border-radius:8px;padding:9px 12px;font-weight:800;font-size:11px;
- background:transparent;color:#bfd0dc;cursor:pointer}
-.nuvio-preview-toolbar-controls button[aria-pressed=true]{background:#245a73;color:#f6ffff;box-shadow:inset 0 0 0 1px #4e90ad}
-.nuvio-preview-toolbar-controls button:focus-visible{outline:2px solid #a2e5ff}
-.nuvio-preview-layout{display:grid;gap:13px;grid-template-columns:minmax(0,1fr);align-items:start}
-.nuvio-preview-layout.with-inspector{grid-template-columns:minmax(0,1fr) minmax(250px,275px)}
-.nuvio-preview-device{width:100%;min-width:0;margin:0 auto;padding:9px;border:1px solid #354d61;border-radius:17px;
- background:#060d16;box-shadow:0 24px 50px #0107107d;transition:max-width .2s}
-.nuvio-preview-device.mobile{max-width:400px;border-radius:28px;padding:11px}
-.nuvio-preview-screen{min-height:540px;max-height:85vh;overflow-y:auto;overscroll-behavior:contain;
- border-radius:11px;color:#e5edf3;background:linear-gradient(160deg,#18283c 0,#0b1423 35%,#080d19 100%);
- font-family:Manrope,system-ui,sans-serif}
-.nuvio-preview-device.mobile .nuvio-preview-screen{min-height:570px;max-height:760px;border-radius:21px}
-.nuvio-preview-header{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:18px 23px 12px;
- background:#0a1222aa;position:sticky;top:0;z-index:2;backdrop-filter:blur(15px)}
-.nuvio-preview-brand{font-size:21px;font-weight:950;letter-spacing:.04em;color:#f5faff;margin-right:auto}
-.nuvio-preview-header-link{font-size:11px;font-weight:700;color:#a5bac9}
-.nuvio-preview-header-link.active{color:#efffff;border-bottom:2px solid #6ccbea;padding-bottom:4px}
-.nuvio-preview-screen-caption{background:#304352;font-size:8px;font-weight:800;letter-spacing:.08em;
- padding:5px 7px;border-radius:5px;color:#d7edf8}
-.nuvio-preview-trail{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:10px 23px;
- font-size:10px;color:#98bdcb}
-.nuvio-preview-trail button,.nuvio-preview-footer button{background:none;border:none;color:#c5e4ef;
- cursor:pointer;font:700 10px Manrope,sans-serif;padding:4px 0}
-.nuvio-preview-trail strong{color:white}
-.nuvio-preview-body{padding:0 23px 20px;min-width:0}
-.nuvio-preview-hero{margin:4px 0 21px;padding:32px 23px;border-radius:11px;
- background:linear-gradient(105deg,#1c3f59cc,#14273caa 65%,#171f33b0);
- border:1px solid #31526a}
-.nuvio-preview-hero>span,.nuvio-preview-detail>div>span{font-size:9px;letter-spacing:.13em;
- font-weight:850;color:#8dcde1}
-.nuvio-preview-hero h2{font-size:clamp(20px,3vw,31px);line-height:1.2;margin:9px 0;color:#f6ffff}
-.nuvio-preview-hero p{font-size:11px;color:#bbd4e0;line-height:1.6;margin:0}
-.nuvio-preview-body h3{display:flex;gap:9px;align-items:center;color:#e1f1fb;font-size:16px;margin:10px 0 13px}
-.nuvio-preview-body h3 small{font-weight:650;color:#8ebdd3;font-size:11px}
-.nuvio-preview-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(142px,1fr));gap:13px}
-.nuvio-preview-tiles.as-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
-.nuvio-preview-tile{display:grid;gap:0;text-align:left;align-content:start;min-width:0;
- border:1px solid #2f465d;background:#132238;color:#f2f9ff;border-radius:9px;overflow:hidden;
- cursor:pointer;padding:0;transition:transform .12s,border-color .12s}
-.nuvio-preview-tile:hover,.nuvio-preview-tile:focus-visible,.nuvio-preview-title:hover,.nuvio-preview-title:focus-visible{
- border-color:#75d7f4;outline:2px solid #7edaf548;transform:translateY(-2px)}
-.nuvio-preview-art{display:grid;place-items:center;position:relative;overflow:hidden;aspect-ratio:16/9;
- background:linear-gradient(130deg,#2b3e56,#161f34 70%);color:#91a5b5}
-.nuvio-preview-art.poster{aspect-ratio:2/3}
-.nuvio-preview-art.square{aspect-ratio:1/1}
-.nuvio-preview-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.nuvio-preview-empty{font-size:10px;font-weight:700;max-width:90%;padding:10px;text-align:center}
-.nuvio-preview-tile-info{padding:11px 10px;display:grid;gap:5px}
-.nuvio-preview-tile-info strong,.nuvio-preview-title strong{font-size:11px;font-weight:800;
- line-height:1.4;word-break:break-word}
-.nuvio-preview-tile-info small,.nuvio-preview-title small{font-size:9px;color:#a2baca;line-height:1.45}
-.nuvio-preview-source-list{display:grid;gap:8px}
-.nuvio-preview-source-list>button{display:flex;gap:12px;align-items:center;text-align:left;min-width:0;
- background:#182940;color:#e5f3ff;border:1px solid #38516a;border-radius:9px;padding:14px;cursor:pointer}
-.nuvio-preview-source-list>button:hover,.nuvio-preview-source-list>button:focus-visible{border-color:#75d7f4;outline:2px solid #7edaf53a}
-.nuvio-preview-source-list>button>span:nth-child(2){display:grid;gap:5px;min-width:0;flex:1}
-.nuvio-preview-source-list strong{font-size:11px}
-.nuvio-preview-source-list small{font-size:10px;color:#aec9d8}
-.nuvio-preview-source-order{font-weight:850;font-size:11px;background:#244e66;border-radius:6px;padding:7px;color:#d8f5ff}
-.nuvio-preview-dot{width:8px;height:8px;flex:0 0 8px;display:inline-block;border-radius:50%;background:#8b97a8}
-.nuvio-preview-dot.ready{background:#4bd5ad}.nuvio-preview-dot.missing{background:#f88b92}.nuvio-preview-dot.pending{background:#f0c87b}
-.nuvio-preview-tabs{display:flex;align-items:center;gap:6px;overflow:auto;padding:0 0 12px;scrollbar-width:thin}
-.nuvio-preview-tab{display:flex;align-items:center;gap:8px;white-space:nowrap;padding:10px 13px;border:1px solid #374d60;
- border-radius:8px;background:#1a2b3e;color:#c2d7e4;font:750 11px Manrope,sans-serif;cursor:pointer}
-.nuvio-preview-tab.active,.nuvio-preview-tab:hover{color:#fff;background:#27566b;border-color:#77c2da}
-.nuvio-preview-sectionhead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:9px;margin:6px 0}
-.nuvio-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:12px}
-.nuvio-preview-title{display:grid;gap:7px;align-content:start;min-width:0;border:1px solid transparent;
- border-radius:9px;padding:4px;text-align:left;background:none;color:#f5faff;cursor:pointer}
-.nuvio-preview-title strong{font-size:10px}.nuvio-preview-title small{font-size:9px}
-.nuvio-preview-pagination{margin:22px 0;display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
-.nuvio-preview-pagination span{font-size:10px;color:#b7d1e1}
-.nuvio-preview-message,.nuvio-preview-loading{border:1px dashed #526c84;border-radius:9px;
- padding:24px;min-height:100px;display:grid;gap:12px;justify-items:center;align-content:center;
- color:#aecddd;font-size:12px;text-align:center}
-.nuvio-preview-message.is-warning{border-color:#b58868;color:#ffdbb5}
-.nuvio-preview-detail{display:grid;grid-template-columns:minmax(95px,185px) 1fr;gap:20px;align-items:start}
-.nuvio-preview-detail h2{font-size:25px;margin:10px 0}.nuvio-preview-detail p{font-size:12px;line-height:1.7;color:#b8d2df}
-.nuvio-preview-footer{border-top:1px solid #344759;display:flex;justify-content:space-between;
- gap:10px;align-items:center;padding:13px 23px;color:#7ba1b4;font-size:9px}
-.nuvio-preview-inspector{display:grid;gap:14px;padding:17px;border-radius:12px;border:1px solid #365269;
- background:#101f30;min-width:0;color:#daeaf5}
-.nuvio-preview-inspector h3{font-size:13px;margin:0}
-.nuvio-preview-inspector-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-.nuvio-preview-inspector-stats span{display:grid;gap:4px;text-align:center;border:1px solid #344d61;
- border-radius:8px;padding:8px 3px;font-size:9px;color:#a8bfcf}
-.nuvio-preview-inspector-stats b{font-size:16px;color:#b6ebff}
-.nuvio-preview-inspector dl{display:grid;grid-template-columns:90px minmax(0,1fr);gap:8px;align-items:start;
- margin:0;font-size:11px;border-top:1px solid #355068;padding-top:12px}
-.nuvio-preview-inspector dt{color:#91b4c7}.nuvio-preview-inspector dd{margin:0;overflow-wrap:anywhere}
-.nuvio-preview-issues{border:1px solid #996d59;background:#382c30;color:#ffd7bd;border-radius:8px;padding:10px}
-.nuvio-preview-issues p{font-size:11px;line-height:1.5;margin:3px 0}
-.nuvio-preview-ok{border:1px solid #366f65;background:#173b36;color:#aef0d3;border-radius:8px;
- padding:10px;font-size:10px;line-height:1.5}
-.nuvio-preview-inspector>.muted{font-size:10px;line-height:1.6}
-.nuvio-preview-device.mobile .nuvio-preview-header{padding:16px 13px;gap:9px}
-.nuvio-preview-device.mobile .nuvio-preview-header-link{font-size:9px}
-.nuvio-preview-device.mobile .nuvio-preview-brand{font-size:16px}
-.nuvio-preview-device.mobile .nuvio-preview-hero{padding:21px 14px}
-.nuvio-preview-device.mobile .nuvio-preview-body{padding:0 13px 20px}
-.nuvio-preview-device.mobile .nuvio-preview-trail{padding:12px 13px}
-.nuvio-preview-device.mobile .nuvio-preview-tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.nuvio-preview-device.mobile .nuvio-preview-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-@media(max-width:1100px){.nuvio-preview-layout.with-inspector{grid-template-columns:1fr}
- .nuvio-preview-inspector{grid-template-columns:1fr;max-width:none}
-}
-@media(max-width:600px){
- .nuvio-preview-toolbar{padding:10px}
- .nuvio-preview-toolbar-controls{width:100%;justify-content:space-between}
- .nuvio-preview-toolbar-controls button{font-size:10px;padding:9px 8px}
- .nuvio-preview-device{padding:5px}
- .nuvio-preview-screen{min-height:420px;max-height:75vh}
- .nuvio-preview-header{padding:12px;gap:8px}
- .nuvio-preview-brand{font-size:17px}
- .nuvio-preview-header-link{font-size:9px}
- .nuvio-preview-trail{padding:10px 12px}
- .nuvio-preview-body{padding:0 12px 18px}
- .nuvio-preview-hero{padding:19px 13px}
- .nuvio-preview-tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
- .nuvio-preview-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
- .nuvio-preview-footer{padding:10px 12px}
- .nuvio-preview-detail{grid-template-columns:100px 1fr;gap:12px}
- .nuvio-preview-detail h2{font-size:18px}
-}
-
-/* Mockup TV 16:9; em tela estreita a altura volta a ser fluida. */
-@media(min-width:700px){
- .nuvio-preview-device.tv .nuvio-preview-screen{aspect-ratio:16/9;min-height:460px}
-}
-.nuvio-preview-hero{position:relative;isolation:isolate;overflow:hidden}
-.nuvio-preview-hero>*:not(.nuvio-preview-hero-image){position:relative;z-index:1}
-.nuvio-preview-hero:has(.nuvio-preview-hero-image){background:linear-gradient(90deg,#13283a,#15293ce6)}
-.nuvio-preview-hero:has(.nuvio-preview-hero-image)::after{
- content:'';position:absolute;inset:0;z-index:0;background:linear-gradient(90deg,#14273df0 10%,#12283cb0 70%,#15263c50);
-}
-.nuvio-preview-hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;opacity:.52}
-.nuvio-preview-tiles.as-horizontal{display:flex;gap:12px;overflow-x:auto;overscroll-behavior-inline:contain;padding:0 0 9px}
-.nuvio-preview-tiles.as-horizontal>.nuvio-preview-tile{flex:0 0 166px}
-.nuvio-preview-tiles.with-glow>.nuvio-preview-tile:focus-visible{
- box-shadow:0 0 20px #8be5f777,0 0 4px #7acfee}
-
-/* Ajuste de composição: canvas nunca invade o inspetor no desktop. */
-.nuvio-preview-layout,.nuvio-preview-device,.nuvio-preview-screen,.nuvio-preview-header,
-.nuvio-preview-trail,.nuvio-preview-body,.nuvio-preview-grid,.nuvio-preview-tabs{
- min-width:0;max-width:100%;box-sizing:border-box;
-}
-.nuvio-preview-device{width:100%}
-.nuvio-preview-screen{width:100%;overflow-x:hidden}
-.nuvio-preview-layout.with-inspector{grid-template-columns:minmax(0,1fr) minmax(250px,275px)}
-@media(max-width:1500px){
- .nuvio-preview-layout.with-inspector{grid-template-columns:minmax(0,1fr)}
- .nuvio-preview-inspector{width:100%;max-width:100%;box-sizing:border-box}
-}
-
-.nuvio-preview-sample-note{font-size:10px;line-height:1.55;color:#a7c5d8;padding:7px 0 0;margin:0}
-
 /* Nuvio Studio v2 — design system for the whole editor.
  * TV canvas alone mimics the Nuvio viewer; editor controls remain visually distinct. */
-:root{
- --bg:#090d15;--surface:#121b29;--card:#172334;--card2:#1a293b;
- --hover:#24364d;--line:#29384b;--txt:#f1f6fc;--muted:#9cabbd;
- --soft:#768da4;--accent:#9dd9fa;--accentdark:#1c3449;--teal:#64d3ad;
- --danger:#fb9eac;--radius:16px;
-}
+.nuvio-preview-dot{width:8px;height:8px;flex:0 0 8px;display:inline-block;border-radius:50%;background:#8b97a8}
+.nuvio-preview-dot.ready{background:#4bd5ad}.nuvio-preview-dot.missing{background:#f88b92}.nuvio-preview-dot.pending{background:#f0c87b}
+.nuvio-preview-sample-note{font-size:10px;line-height:1.55;color:#a7c5d8;padding:7px 0 0;margin:0}
 body{background:radial-gradient(circle at 76% -20%,#24365054,transparent 45%),#090d15}
 .sidebar{background:linear-gradient(180deg,#101a28,#0b121e);border-color:#2c394b;padding-top:24px}
 .brand{padding-bottom:32px}
