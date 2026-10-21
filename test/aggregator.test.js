@@ -120,8 +120,8 @@ describe('Deduplication & Badges', () => {
   it('deve enriquecer badges com o nome e ícone do addon', () => {
     const stream = { name: '1080p RealDebrid', title: 'Movie' };
     const enriched = enrichStreamBadge(stream, 'Torrentio', 'addon');
-    assert.match(enriched.name, /\[.*Torrentio\]/);
-    assert.ok(enriched.name.includes('⚡'));
+    assert.match(enriched.name, /^Agregador \| Torrentio \| 1080p RealDebrid/);
+    assert.match(enriched.description, /^Origem: Torrentio/);
   });
 });
 
@@ -132,6 +132,7 @@ describe('Manifest Generator', () => {
     });
 
     assert.equal(manifest.id, 'community.streamaggregator.unified');
+    assert.equal(manifest.name, 'Agregador');
     assert.ok(manifest.resources.some(r => r.name === 'stream'));
     assert.ok(manifest.types.includes('movie'));
     assert.ok(manifest.types.includes('series'));

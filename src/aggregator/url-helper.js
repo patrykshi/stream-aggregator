@@ -1,3 +1,17 @@
+export function formatExtraPath(extra) {
+  if (!extra) return '';
+  let decoded = String(extra);
+  try { decoded = decodeURIComponent(decoded); } catch {}
+  const parts = decoded.split('&').filter(Boolean);
+  return '/' + parts.map(part => {
+    const eqIdx = part.indexOf('=');
+    if (eqIdx === -1) return encodeURIComponent(part);
+    const key = part.slice(0, eqIdx);
+    const val = part.slice(eqIdx + 1);
+    return `${encodeURIComponent(key)}=${encodeURIComponent(val)}`;
+  }).join('&');
+}
+
 /**
  * Utilitário para parsing, normalização e construção de URLs de Addons Stremio.
  */
@@ -39,12 +53,10 @@ export function parseAddonUrl(raw) {
       search,
       getStreamUrl: (type, id) => `${baseUrl}/stream/${encodeURIComponent(type)}/${encodeURIComponent(id)}.json${search}`,
       getSubtitleUrl: (type, id, extra = '') => {
-        const extraPart = extra ? `/${encodeURIComponent(extra)}` : '';
-        return `${baseUrl}/subtitles/${encodeURIComponent(type)}/${encodeURIComponent(id)}${extraPart}.json${search}`;
+        return `${baseUrl}/subtitles/${encodeURIComponent(type)}/${encodeURIComponent(id)}${formatExtraPath(extra)}.json${search}`;
       },
       getCatalogUrl: (type, catalogId, extra = '') => {
-        const extraPart = extra ? `/${encodeURIComponent(extra)}` : '';
-        return `${baseUrl}/catalog/${encodeURIComponent(type)}/${encodeURIComponent(catalogId)}${extraPart}.json${search}`;
+        return `${baseUrl}/catalog/${encodeURIComponent(type)}/${encodeURIComponent(catalogId)}${formatExtraPath(extra)}.json${search}`;
       },
       getMetaUrl: (type, id) => `${baseUrl}/meta/${encodeURIComponent(type)}/${encodeURIComponent(id)}.json${search}`
     };

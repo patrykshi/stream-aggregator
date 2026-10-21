@@ -76,26 +76,27 @@ export function filterStreams(streams, filters = {}) {
 /**
  * Desduplica streams baseando-se em infoHash ou assinatura única.
  */
-export function deduplicateStreams(streams) {
+export function deduplicateStreams(streams, getSource = () => '') {
   const seenHashes = new Set();
   const seenUrls = new Set();
   const result = [];
 
   for (const stream of streams) {
-    // 1. Desduplicação por infoHash (Torrents)
+    // Preserve a escolha entre fontes de provedores diferentes, mesmo que
+    // tenham encontrado o mesmo torrent/arquivo. Desduplique DENTRO da origem.
+    const source = String(getSource(stream) || '');
     if (stream.infoHash) {
-      const hash = String(stream.infoHash).toLowerCase();
-      if (seenHashes.has(hash)) continue;
-      seenHashes.add(hash);
+      const key = source + '|' + String(stream.infoHash).toLowerCase();
+      if (seenHashes.has(key)) continue;
+      seenHashes.add(key);
       result.push(stream);
       continue;
     }
 
-    // 2. Desduplicação por URL direta
     if (stream.url) {
-      const urlClean = stream.url.split('?')[0]; // Remove tokens efêmeros de query se iguais
-      if (seenUrls.has(urlClean)) continue;
-      seenUrls.add(urlClean);
+      const key = source + '|' + stream.url.split('?')[0];
+      if (seenUrls.has(key)) continue;
+      seenUrls.add(key);
       result.push(stream);
       continue;
     }
@@ -121,6 +122,15 @@ const ADDON_ICONS = {
   froststream: '❄️',
   frost: '❄️',
   emby: '🟢',
+  mediaedge: '☁️',
+  legendas: '💬',
+  brazuca: '🇧🇷',
+  magneto: '🧲',
+  magnetflix: '🧲',
+  unioflix: '🎞️',
+  betor: '📦',
+  superstream: '🎬',
+  kingvod: '👑',
   mediafusion: '🎬',
   comet: '☄️',
   stremthru: '🚀',
@@ -152,17 +162,31 @@ export function enrichStreamBadge(stream, addonName, badgeFormat = 'addon') {
   }
 
   const copy = { ...stream };
-  const icon = getAddonIcon(addonName);
-  const tag = `[${icon} ${addonName}]`;
+  const label = addonName.replace(/[\r\n\t]/g, ' ').trim();
+  const prefix = `Agregador | ${label} | `;
 
   if (badgeFormat === 'addon') {
-    // Insere o badge com ícone no nome do addon ou no topo do título
-    if (copy.name) {
-      if (!copy.name.includes(tag)) {
-        copy.name = `${tag} ${copy.name}`;
-      }
-    } else {
-      copy.name = tag;
+    // Nuvio Legacy (TV) nao renderiza varios emojis do nome e mostra o
+    // "addon" como Unified Stream Aggregator. Use texto simples nas linhas
+    // realmente exibidas (name e description), inclusive no modo "Do addon".
+    // Nao modificar URL, hash, headers nem metadados de reproducao.
+    const originalName = copy.name || '';
+    const originalTitle = copy.title || '';
+    const originalDescription = copy.description || '';
+    if (!originalName.startsWith(prefix)) {
+      copy.name = prefix + originalName;
+    }
+    if (originalTitle && !originalTitle.startsWith(prefix)) {
+      copy.title = prefix + originalTitle;
+    }
+
+    // Nuvio Legacy conserva "description" e mostra sua primeira linha
+    // no modo de texto do addon e no cartao de detalhes (v2.0.5+).
+    // Quando o provedor original so envia title, preserve-o abaixo da origem.
+    const origin = `Origem: ${label}`;
+    if (!originalDescription.startsWith(origin)) {
+      const details = originalDescription || originalTitle || originalName;
+      copy.description = details ? `${origin}\n${details}` : origin;
     }
   }
 

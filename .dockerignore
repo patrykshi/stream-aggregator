@@ -9,3 +9,12 @@ Dockerfile
 docker-compose*.yml
 .DS_Store
 
+
+data
+cloudflared
+.agents
+.codex
+docs
+scripts
+.env*
+*.tar.gz

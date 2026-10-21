@@ -71,7 +71,14 @@ function saveProfilesMap(profilesMap) {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    fs.writeFileSync(PROFILES_FILE, JSON.stringify(profilesMap, null, 2), 'utf-8');
+    // Escrita atômica + chmod 0600 para credenciais de addons.
+    const temp=PROFILES_FILE+'.'+process.pid+'.tmp';
+    try {
+      fs.writeFileSync(temp,JSON.stringify(profilesMap,null,2),{encoding:'utf-8',mode:0o600});
+      fs.chmodSync(temp,0o600);
+      fs.renameSync(temp,PROFILES_FILE);
+      fs.chmodSync(PROFILES_FILE,0o600);
+    }finally{try{fs.unlinkSync(temp);}catch{}}
     return true;
   } catch (err) {
     console.error('[Profiles] Erro ao salvar profiles.json:', err.message);

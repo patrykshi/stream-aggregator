@@ -76,9 +76,18 @@ export function sanitizeConfig(cfg) {
         .map((a, idx) => ({
           url: a.url.trim().replace(/\/$/, ''),
           name: typeof a.name === 'string' && a.name.trim() ? a.name.trim() : `Addon ${idx + 1}`,
-          timeoutMs: typeof a.timeoutMs === 'number' && a.timeoutMs >= 20000 ? a.timeoutMs : 25000,
+          // Campo legado continua igual; o novo timeout é separado para
+          // não aumentar silenciosamente os 7,5 s antigos para 25 s.
+          timeoutMs: typeof a.timeoutMs === 'number' && a.timeoutMs >= 3000 ? a.timeoutMs : 25000,
+          requestTimeoutMs: Number.isInteger(a.requestTimeoutMs) &&
+            a.requestTimeoutMs >= 3000 && a.requestTimeoutMs <= 30000 ? a.requestTimeoutMs : null,
+          resourceSelectionConfigured: a.resourceSelectionConfigured === true,
           enabled: a.enabled !== false,
-          resources: Array.isArray(a.resources) && a.resources.length > 0 ? a.resources : ['stream'],
+          resources: Array.isArray(a.resources) ? [...new Set(a.resources.filter(r=>
+            ['stream','catalog','meta','subtitles'].includes(r)))] : ['stream'],
+          idPrefixes: Array.isArray(a.idPrefixes)
+            ? a.idPrefixes.filter(p => typeof p === 'string' && p.length > 0)
+            : [],
           catalogs: Array.isArray(a.catalogs) ? a.catalogs : [],
           includeCatalogs: a.includeCatalogs !== false
         }))

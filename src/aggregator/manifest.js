@@ -1,4 +1,4 @@
-import { buildCatalogId } from './catalogs.js';
+import { buildCatalogId,stableCatalogId } from './catalogs.js';
 
 /**
  * Gera o manifest.json compatível com o Stremio para uma dada configuração,
@@ -46,11 +46,13 @@ export function generateManifest(config = {}) {
   } else {
     // Fallback padrão: compila automaticamente de cada addon ativo
     activeAddons.forEach((addon, idx) => {
-      if (addon.includeCatalogs !== false && Array.isArray(addon.catalogs) && addon.catalogs.length > 0) {
+      if (addon.includeCatalogs !== false &&
+          (!addon.resourceSelectionConfigured || (addon.resources||[]).includes('catalog')) &&
+          Array.isArray(addon.catalogs) && addon.catalogs.length > 0) {
         addon.catalogs.forEach(cat => {
           aggregatedCatalogs.push({
             type: cat.type || 'movie',
-            id: buildCatalogId(idx, cat.id, cat.type),
+            id: addon.url ? stableCatalogId(addon.url,cat.id,cat.type) : buildCatalogId(idx,cat.id,cat.type),
             name: `[${addon.name}] ${cat.name || cat.id}`,
             extra: cat.extra || [{ name: 'skip', isRequired: false }]
           });
@@ -59,11 +61,13 @@ export function generateManifest(config = {}) {
     });
   }
 
+  const commonIdPrefixes = ['tt', 'kitsu', 'tmdb', 'tvdb', 'emby'];
+
   const resources = [
     {
       name: 'stream',
       types: ['movie', 'series', 'anime', 'other'],
-      idPrefixes: ['tt', 'kitsu', 'tmdb']
+      idPrefixes: commonIdPrefixes
     }
   ];
 
@@ -71,7 +75,7 @@ export function generateManifest(config = {}) {
     resources.push({
       name: 'subtitles',
       types: ['movie', 'series', 'anime', 'other'],
-      idPrefixes: ['tt', 'kitsu', 'tmdb']
+      idPrefixes: commonIdPrefixes
     });
   }
 
@@ -79,7 +83,7 @@ export function generateManifest(config = {}) {
     resources.push({
       name: 'meta',
       types: ['movie', 'series', 'anime', 'other'],
-      idPrefixes: ['tt', 'kitsu', 'tmdb']
+      idPrefixes: commonIdPrefixes
     });
   }
 
@@ -89,8 +93,8 @@ export function generateManifest(config = {}) {
 
   return {
     id: 'community.streamaggregator.unified',
-    version: '1.3.0',
-    name: 'Unified Stream Aggregator',
+    version: '1.3.2',
+    name: 'Agregador',
     description,
     logo: 'https://cdn-icons-png.flaticon.com/512/3845/3845868.png',
     background: 'https://images.unsplash.com/photo-1574267432553-4b4628081c31?auto=format&fit=crop&w=1600&q=80',

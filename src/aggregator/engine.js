@@ -1,5 +1,7 @@
 import { filterStreams, deduplicateStreams, enrichStreamBadge } from './filter.js';
 import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './url-helper.js';
+import { resolveAddonId } from './id-resolver.js';
+import { recordSearch, recordSearchDelivery, recordAggregate } from './monitor.js';
 
 // Cache LRU em memória simples com TTL
 class SimpleCache {
@@ -45,53 +47,62 @@ export function normalizeAddonBaseUrl(rawUrl) {
  * Consulta os streams de um addon específico com timeout.
  */
 async function fetchAddonStreams(addon, type, id) {
+  const started = Date.now();
   const parsed = parseAddonUrl(addon.url);
   if (!parsed) {
-    console.warn(`[${addon.name}] URL de addon inválida: ${addon.url}`);
-    return [];
+    return { streams: [], status: 'invalid_url', durationMs: 0 };
   }
 
-  const streamUrl = parsed.getStreamUrl(type, id);
-  // Timeout ágil para streams (máximo 7500ms para responder antes do timeout estrito do Stremio/Nuvio)
-  const configuredTimeout = typeof addon.timeoutMs === 'number' ? addon.timeoutMs : 7000;
-  const timeoutMs = Math.min(Math.max(configuredTimeout, 3000), 7500);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  const startTime = Date.now();
-
+  // Orçamento total por provedor, configurável de 3 a 30 segundos.
+  // Instalações antigas mantêm o limite efetivo de 7,5 segundos.
+  let resolvedId = id;
   try {
-    const res = await fetch(streamUrl, {
+    resolvedId = await resolveAddonId(addon, type, id);
+  } catch {
+    // O ID original continua válido para provedores que não precisam da tradução.
+  }
+  const converted = resolvedId !== id;
+  const streamUrl = parsed.getStreamUrl(type, resolvedId);
+  const totalBudget = Number.isInteger(addon.requestTimeoutMs)
+    ? Math.min(Math.max(addon.requestTimeoutMs,3000),30000) : 7500;
+  const remaining = Math.max(1, totalBudget - (Date.now() - started));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), remaining);
+  try {
+    const response = await fetch(streamUrl, {
       signal: controller.signal,
       headers: DEFAULT_FETCH_HEADERS,
       redirect: 'follow'
     });
-
+    if (!response.ok) {
+      console.warn(`[${addon.name}] HTTP ${response.status} em ${Date.now() - started}ms`);
+      return {
+        streams: [], status: 'http_error', httpStatus: response.status,
+        idConverted: converted, durationMs: Date.now() - started
+      };
+    }
+    const data = await response.json();
+    if (!Array.isArray(data?.streams)) {
+      return {
+        streams: [], status: 'invalid_response',
+        idConverted: converted, durationMs: Date.now() - started
+      };
+    }
+    const count = data.streams.length;
+    console.log(`[${addon.name}] ${count} fonte(s) em ${Date.now() - started}ms`);
+    return {
+      streams: data.streams, status: count ? 'results' : 'empty',
+      idConverted: converted, durationMs: Date.now() - started
+    };
+  } catch (error) {
+    const timeout = controller.signal.aborted || error.name === 'AbortError' || error.name === 'TimeoutError';
+    console.warn(`[${addon.name}] ${timeout ? 'timeout' : 'falha de rede'} em ${Date.now() - started}ms`);
+    return {
+      streams: [], status: timeout ? 'timeout' : 'network_error',
+      idConverted: converted, durationMs: Date.now() - started
+    };
+  } finally {
     clearTimeout(timeoutId);
-    const elapsed = Date.now() - startTime;
-
-    if (!res.ok) {
-      console.warn(`[${addon.name}] HTTP ${res.status} após ${elapsed}ms em ${streamUrl}`);
-      return [];
-    }
-
-    const data = await res.json();
-    if (!data || !Array.isArray(data.streams)) {
-      console.log(`[${addon.name}] Respondeu em ${elapsed}ms sem streams.`);
-      return [];
-    }
-
-    console.log(`[${addon.name}] ✅ ${data.streams.length} stream(s) encontrados em ${elapsed}ms`);
-    return data.streams;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    const elapsed = Date.now() - startTime;
-    if (err.name === 'AbortError') {
-      console.warn(`[${addon.name}] ⏱️ Timeout de ${timeoutMs}ms excedido.`);
-    } else {
-      console.warn(`[${addon.name}] ❌ Falha após ${elapsed}ms:`, err.message);
-    }
-    return [];
   }
 }
 
@@ -111,36 +122,46 @@ export async function aggregateStreams(config, type, id) {
   const cacheKey = `${type}:${id}:${JSON.stringify(config)}`;
   const cached = streamCache.get(cacheKey);
   if (cached) {
+    recordAggregate({ type, cacheHit: true, activeProviders: activeAddons.length, delivered: cached.streams.length });
     return cached;
   }
 
-  // Dispara consultas paralelas a todos os addons
-  const fetchPromises = activeAddons.map(async addon => {
+  const started = Date.now();
+  const streamSources = new WeakMap();
+
+  // Prioridade = ordem persistida no perfil main. Consultas continuam
+  // paralelas, mas começam com pequeno intervalo para garantir que provedores
+  // de maior prioridade recebam primeiro a solicitação sem serializar a busca.
+  const fetchPromises = activeAddons.map(async (addon,priorityIndex) => {
+    if(priorityIndex>0)
+      await new Promise(resolve=>setTimeout(resolve,Math.min(priorityIndex*55,880)));
+    let outcome;
     try {
-      let streams = await fetchAddonStreams(addon, type, id);
-
-      // Limita streams por addon
-      if (config.filters?.maxStreamsPerAddon && streams.length > config.filters.maxStreamsPerAddon) {
-        streams = streams.slice(0, config.filters.maxStreamsPerAddon);
-      }
-
-      // Enriquece streams com o nome do addon
-      return streams.map(s => enrichStreamBadge(s, addon.name, config.badgeFormat));
-    } catch (err) {
-      console.error(`Erro ao processar streams do addon ${addon.name}:`, err);
-      return [];
+      outcome = await fetchAddonStreams(addon, type, id);
+    } catch {
+      outcome = { streams: [], status: 'network_error', durationMs: 0 };
     }
+    const rawCount = outcome.streams.length;
+    recordSearch(addon, { ...outcome, count: rawCount });
+    let streams = outcome.streams;
+    if (config.filters?.maxStreamsPerAddon && streams.length > config.filters.maxStreamsPerAddon) {
+      streams = streams.slice(0, config.filters.maxStreamsPerAddon);
+    }
+    return streams.map(s => {
+      const enriched = enrichStreamBadge(s, addon.name, config.badgeFormat);
+      streamSources.set(enriched, addon.url);
+      return enriched;
+    });
   });
 
   const settled = await Promise.allSettled(fetchPromises);
-
-  // Combina streams respeitando a ordem de prioridade definida pelo usuário
   let combinedStreams = [];
   for (const item of settled) {
     if (item.status === 'fulfilled' && Array.isArray(item.value)) {
       combinedStreams.push(...item.value);
     }
   }
+  const received = combinedStreams.length;
 
   // Aplica filtros (resolução, cams, regex)
   if (config.filters) {
@@ -149,7 +170,7 @@ export async function aggregateStreams(config, type, id) {
 
   // Desduplica se configurado
   if (config.deduplicate) {
-    combinedStreams = deduplicateStreams(combinedStreams);
+    combinedStreams = deduplicateStreams(combinedStreams, stream => streamSources.get(stream));
   }
 
   // Limite total de streams
@@ -157,6 +178,18 @@ export async function aggregateStreams(config, type, id) {
     combinedStreams = combinedStreams.slice(0, config.filters.maxTotalStreams);
   }
 
+  for (const addon of activeAddons) {
+    const delivered = combinedStreams.filter(stream => streamSources.get(stream) === addon.url).length;
+    recordSearchDelivery(addon, delivered);
+  }
+  recordAggregate({
+    type,
+    cacheHit: false,
+    activeProviders: activeAddons.length,
+    receivedBeforeFilters: received,
+    delivered: combinedStreams.length,
+    durationMs: Date.now() - started
+  });
   const result = { streams: combinedStreams };
   streamCache.set(cacheKey, result);
   return result;

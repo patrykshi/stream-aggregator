@@ -1,0 +1,76 @@
+import {spawn} from 'node:child_process';
+import fs from 'node:fs';
+const port=9488,profile='/tmp/nuvio-ui-redesign-cdp-20261021';
+const chrome=spawn('/usr/bin/google-chrome',['--headless=new','--no-sandbox','--disable-dev-shm-usage',
+ '--disable-gpu','--remote-allow-origins=*','--remote-debugging-port='+port,
+ '--user-data-dir='+profile,'about:blank'],{stdio:'ignore'});
+let ws,seq=0,requests=[],errors=[];const pending=new Map();
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const wait=async(fn,label,tries=145)=>{for(let i=0;i<tries;i++){try{const x=await fn();if(x)return x;}catch{}await sleep(170);}throw Error('timeout '+label);};
+try{
+ const tab=await wait(async()=>{const res=await fetch('http://127.0.0.1:'+port+'/json/list');return (await res.json()).find(x=>x.type==='page')},'Chrome ready');
+ ws=new WebSocket(tab.webSocketDebuggerUrl);await new Promise(r=>ws.onopen=r);
+ ws.onmessage=e=>{const x=JSON.parse(e.data);
+  if(x.id){const p=pending.get(x.id);if(p){pending.delete(x.id);x.error?p.reject(Error(x.error.message)):p.resolve(x.result);}}
+  if(x.method==='Runtime.exceptionThrown')errors.push(x.params.exceptionDetails?.text||'Unknown runtime error');
+  if(x.method==='Network.requestWillBeSent'&&/^(POST|PUT|DELETE|PATCH)$/.test(x.params.request.method))
+   requests.push({method:x.params.request.method,path:new URL(x.params.request.url).pathname});
+ };
+ const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
+ const ev=async(expression)=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.text);return r.result.value;};
+ const click=selector=>ev('(()=>{const el=document.querySelector('+JSON.stringify(selector)+');if(!el)throw Error("Missing control");el.click();return true})()');
+ const shot=async name=>{const ss=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync('/tmp/nuvio-ui-'+name+'-20261021.png',Buffer.from(ss.data,'base64'));};
+ await send('Page.enable');await send('Runtime.enable');await send('Network.enable');
+ await send('Emulation.setDeviceMetricsOverride',{width:1360,height:920,deviceScaleFactor:1,mobile:false});
+ await send('Page.navigate',{url:'http://127.0.0.1:7001/?view=collections'});
+ await wait(()=>ev("document.querySelector('.collection-health-counts')?.textContent.includes('857')"),'inventory checked');
+ await click('[data-action=preview-open]');
+ await wait(()=>ev("document.querySelectorAll('.nuvio-preview-rail-block').length===16"),'preview home');
+ await shot('tv-home');
+ const home=await ev("({stage:document.querySelector('.nuvio-preview-body')?.dataset.previewStep,collections:document.querySelectorAll('.nuvio-preview-rail-block').length,visibleRows:document.querySelectorAll('.nuvio-preview-rail-block').length,folderCards:document.querySelectorAll('.nuvio-preview-rail-block .nuvio-preview-folder-card').length,hero:document.querySelector('.nuvio-preview-hero h2')?.textContent,width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+1,inspector:!!document.querySelector('.nuvio-preview-inspector')})");
+ if(home.overflow||home.inspector||home.folderCards<5)throw Error('Home UX '+JSON.stringify(home));
+ await click('.nuvio-preview-rail-block .nuvio-preview-rail-heading [data-pv-action=collection]');
+ await wait(()=>ev("document.querySelector('.nuvio-preview-body')?.dataset.previewStep==='collection'"),'collection');
+ const collection=await ev("({tabs:document.querySelectorAll('.nuvio-preview-tab').length,railed:document.querySelectorAll('.nuvio-preview-folder-card').length,mode:document.querySelector('.nuvio-preview-mode-hint')?.textContent})");
+ if(collection.tabs<1||collection.railed<1)throw Error('Collection '+JSON.stringify(collection));
+ await click('[data-pv-action=focus-folder]');
+ await click('[data-pv-action=folder]');
+ await wait(()=>ev("document.querySelector('.nuvio-preview-body')?.dataset.previewStep==='folder'"),'folder');
+ const folder=await ev("({sources:document.querySelectorAll('.nuvio-preview-source-card').length,title:document.querySelector('.nuvio-preview-hero h2')?.textContent})");
+ if(folder.sources<1)throw Error('Folder '+JSON.stringify(folder));
+ await click('.nuvio-preview-source-card');
+ await wait(()=>ev("document.querySelector('.nuvio-preview-body')?.dataset.previewStep==='catalog'"),'catalog');
+ await wait(()=>ev("!document.querySelector('.nuvio-preview-loading')"),'catalog settled',145);
+ const catalog=await ev("({tabs:document.querySelectorAll('.nuvio-preview-tab').length,posters:document.querySelectorAll('.nuvio-preview-title').length,err:document.querySelector('.nuvio-preview-message')?.textContent||'',hero:document.querySelector('.nuvio-preview-hero h2')?.textContent})");
+ await shot('tv-catalog');
+ if(!catalog.posters)throw Error('No poster sample '+JSON.stringify(catalog));
+ const before=await ev("document.querySelector('.nuvio-preview-hero h2')?.textContent");
+ await ev("document.querySelectorAll('.nuvio-preview-title')[0].focus()");
+ await ev("document.querySelectorAll('.nuvio-preview-title')[1].focus();document.querySelectorAll('.nuvio-preview-title')[1].dispatchEvent(new FocusEvent('focusin',{bubbles:true}))");
+ const after=await ev("document.querySelector('.nuvio-preview-hero h2')?.textContent");
+ if(before===after)throw Error('Modern focused hero not updated '+before);
+ await click('[data-pv-action=layout][data-value=classic]');
+ const classicBefore=await ev("document.querySelector('.nuvio-preview-hero h2')?.textContent");
+ await ev("document.querySelectorAll('.nuvio-preview-title')[2].focus()");
+ const classicAfter=await ev("document.querySelector('.nuvio-preview-hero h2')?.textContent");
+ if(classicBefore!==classicAfter)throw Error('Classic hero changed unexpectedly');
+ await click('[data-pv-action=analyze]');
+ const audit=await ev("({open:!!document.querySelector('.nuvio-preview-inspector'),text:document.querySelector('.nuvio-preview-inspector')?.textContent.slice(0,120)})");
+ if(!audit.open)throw Error('Audit not open');
+ await click('[data-pv-action=device][data-value=mobile]');
+ await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+ await sleep(450);
+ await shot('mobile-catalog');
+ const mobile=await ev("({width:innerWidth,htmlScroll:document.documentElement.scrollWidth,screenScroll:document.querySelector('.nuvio-preview-screen')?.scrollWidth,deviceWidth:Math.ceil(document.querySelector('.nuvio-preview-device')?.getBoundingClientRect().width||0),posterCols:getComputedStyle(document.querySelector('.nuvio-preview-poster-rail')).gridTemplateColumns.split(' ').length})");
+ if(mobile.htmlScroll>mobile.width+1||mobile.deviceWidth>mobile.width+1)throw Error('Mobile overflow '+JSON.stringify(mobile));
+ await click('[data-pv-action=title]');
+ await wait(()=>ev("document.querySelector('.nuvio-preview-body')?.dataset.previewStep==='title'"),'title');
+ await click('[data-pv-action=back]');
+ await click('[data-pv-action=edit-selection]');
+ await wait(()=>ev("!document.querySelector('.nuvio-preview-root')"),'editor return');
+ const editor=await ev("({selected:!!document.querySelector('.collection-item.active'),folder:!!document.querySelector('.folder-item.active'),previewAction:!!document.querySelector('[data-action=preview-open]')})");
+ if(!editor.selected||!editor.folder)throw Error('Lost editor selection '+JSON.stringify(editor));
+ if(requests.some(x=>x.path!=='/api/hub/preview/catalog-items'))throw Error('Unexpected mutation '+JSON.stringify(requests));
+ if(errors.length)throw Error('JS exceptions '+JSON.stringify(errors));
+ console.log(JSON.stringify({success:true,home,collection,folder,catalog,modernHeroUpdates:true,classicHeroFixed:true,audit,mobile,editor,posterRequests:requests.length,writesToLibrary:0,jsErrors:0}));
+}finally{try{ws?.close();}catch{}try{chrome.kill('SIGTERM');}catch{}await sleep(350);try{fs.rmSync(profile,{recursive:true,force:true});}catch{}}

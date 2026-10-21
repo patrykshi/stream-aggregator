@@ -1,568 +1,62 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Stream Aggregator - Hub Unificado</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a111e">
+<meta name="description" content="Nuvio Hub: seus addons, catálogos, coleções e fontes num só lugar.">
+<title>Nuvio Hub — Agregador & Coleções</title>
+<link rel="stylesheet" href="/styles.css">
+<script defer src="/collection-links.js"></script>
+<script defer src="/nuvio-preview.js"></script>
+<script defer src="/app.js"></script>
+<script defer src="/ui-selects.js"></script>
 </head>
 <body>
-  <div class="app-container">
-    <!-- Header -->
-    <header class="header">
-      <div class="logo-area">
-        <div class="logo-icon">⚡</div>
-        <div class="logo-text">
-          <h1>Stream Aggregator</h1>
-          <p class="subtitle">Hub Unificado de Addons, Catálogos e Coleções para Stremio & Nuvio</p>
-        </div>
-      </div>
-      <div class="header-profile-bar">
-        <div class="profile-selector-group">
-          <label for="profileSelect" class="profile-label">👤 Perfil Ativo:</label>
-          <select id="profileSelect" class="select-profile">
-            <option value="main">Principal (main)</option>
-          </select>
-          <button type="button" id="btnNewProfile" class="btn btn-secondary btn-small" title="Criar novo perfil (ex: Sala, Quarto, Kids)">+ Novo</button>
-          <button type="button" id="btnDeleteProfile" class="btn-icon delete btn-small" title="Excluir este perfil" style="display:none;">🗑</button>
-        </div>
-        <div class="profile-actions">
-          <button type="button" id="btnSaveServerProfile" class="btn btn-primary btn-small" title="Salva permanentemente as configurações deste perfil no servidor e sincroniza na hora">
-            ☁️ Salvar no Servidor
-          </button>
-          <span id="profileSyncStatus" class="sync-status-badge">✓ Sincronizado</span>
-        </div>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Nuvio Hub"><span class="brand-mark">N</span>
+      <span><strong>NUVIO<span class="brand-accent">HUB</span></strong><small>Agregador + Collection Studio</small></span>
+    </a>
+    <div class="nav-label">ESPAÇO DE TRABALHO</div>
+    <nav id="nav" aria-label="Navegação principal">
+      <button data-view="overview"><span class="nav-icon">◫</span> Visão geral</button>
+      <button data-view="addons"><span class="nav-icon">▦</span> Addons <span id="navAddonCount" class="nav-count">—</span></button>
+      <button data-view="catalogs"><span class="nav-icon">▤</span> Catálogos <span id="navCatalogCount" class="nav-count">—</span></button>
+      <button data-view="collections"><span class="nav-icon">▣</span> Coleções <span id="navCollectionCount" class="nav-count">—</span></button>
+      <button data-view="monitor"><span class="nav-icon">◷</span> Monitoramento</button>
+      <button data-view="publish"><span class="nav-icon">↗</span> Publicar no Nuvio</button>
+      <button data-view="settings"><span class="nav-icon">⚙</span> Configurações</button>
+    </nav>
+    <div class="sidebar-note">
+      <span class="indicator"></span><strong>Seu espaço, uma biblioteca</strong>
+      <p>Catálogos e coleções usam os mesmos addons configurados no Agregador.</p>
+    </div>
+    <div class="sidebar-bottom"><span id="editAccess" class="access">Verificando acesso...</span><span>Nuvio Hub • Local first</span></div>
+  </aside>
+
+  <div class="main-shell">
+    <header class="topbar">
+      <div class="breadcrumbs"><span class="muted">Espaço de trabalho</span><span class="crumb-sep">/</span><b id="viewLabel">Visão geral</b></div>
+      <div class="top-actions">
+        <span id="saveHint" class="save-hint"></span>
+        <button id="saveButton" type="button" class="btn btn-primary" disabled>Salvar alterações</button>
+        <button id="reloadButton" type="button" class="btn btn-ghost" aria-label="Recarregar informações">↻</button>
       </div>
     </header>
-
-    <!-- Navegação por Abas -->
-    <nav class="tabs-nav">
-      <button type="button" class="tab-btn active" id="tabBtnAddons" onclick="window.switchTab('addons')">
-        <span>⚡ Provedores & Streams</span>
-        <span class="tab-badge" id="tabAddonsBadge">0</span>
-      </button>
-      <button type="button" class="tab-btn" id="tabBtnCatalogs" onclick="window.switchTab('catalogs')">
-        <span>📚 Catálogos & Home</span>
-        <span class="tab-badge" id="tabCatalogsBadge">0</span>
-      </button>
-      <button type="button" class="tab-btn" id="tabBtnCollections" onclick="window.switchTab('collections')">
-        <span>✨ Coleções Nuvio</span>
-        <span class="tab-badge" id="tabCollectionsBadge">0</span>
-      </button>
-    </nav>
-
-    <!-- Aba 1: Addons e Filtros -->
-    <div id="tabContentAddons" class="tab-content active">
-      <main class="content-grid">
-        <!-- Coluna Esquerda: Addons & Provedores -->
-        <section class="card">
-        <div class="card-header">
-          <h2>1. Provedores de Streaming</h2>
-          <span class="badge-count" id="addonCountBadge">0 configurados</span>
-        </div>
-        <p class="card-desc">Adicione manifests de addons. O agregador consultará todos em paralelo respeitando a ordem de prioridade.</p>
-
-        <!-- Presets rápidos -->
-        <div class="presets-section">
-          <label class="section-label">Streams:</label>
-          <div class="preset-buttons">
-            <button type="button" class="btn-preset" data-name="Torrentio" data-url="https://torrentio.strem.fun/manifest.json">+ Torrentio</button>
-            <button type="button" class="btn-preset" data-name="MediaFusion" data-url="https://mediafusion.elfhosted.com/manifest.json">+ MediaFusion</button>
-            <button type="button" class="btn-preset" data-name="Comet" data-url="https://comet.elfhosted.com/manifest.json">+ Comet</button>
-            <button type="button" class="btn-preset" data-name="BestCine" data-url="https://bestcine.dpdns.org/manifest.json">+ Best Cine</button>
-            <button type="button" class="btn-preset" data-name="FrostStream" data-url="https://froststream.cloutteam.com/manifest.json">+ FrostStream</button>
-            <button type="button" class="btn-preset" data-name="Emby Bridge" data-url="http://localhost:7000/manifest.json">+ Emby Local</button>
-          </div>
-          <label class="section-label" style="margin-top: 10px;">Legendas & Catálogos:</label>
-          <div class="preset-buttons">
-            <button type="button" class="btn-preset" data-name="OpenSubtitles v3" data-url="https://opensubtitles-v3.strem.io/manifest.json">+ OpenSubtitles</button>
-            <button type="button" class="btn-preset" data-name="CyberFlix" data-url="https://cyberflix.kamyk.io/manifest.json">+ CyberFlix</button>
-            <button type="button" class="btn-preset" data-name="Cinemeta" data-url="https://v3-cinemeta.strem.io/manifest.json">+ Cinemeta</button>
-          </div>
-        </div>
-
-        <!-- Adicionar Addon Manual -->
-        <div class="add-addon-form">
-          <div class="input-group">
-            <input type="text" id="addonUrlInput" placeholder="Cole a URL do manifest (ex: https://.../manifest.json)" autocomplete="off">
-            <input type="text" id="addonNameInput" placeholder="Nome (opcional)" class="input-name-short" autocomplete="off">
-            <button type="button" id="btnAddAddon" class="btn btn-primary">
-              <span id="btnAddText">Testar & Adicionar</span>
-            </button>
-          </div>
-          <div id="addAddonFeedback" class="feedback-msg"></div>
-        </div>
-
-        <!-- Lista de Addons Ativos -->
-        <div class="addon-list" id="addonList">
-          <div class="empty-state" id="emptyState">
-            Nenhum provedor adicionado ainda. Escolha um preset acima ou cole uma URL de manifest.
-          </div>
-        </div>
-      </section>
-
-      <!-- Coluna Direita: Filtros, Ordenação & Instalação -->
-      <div class="right-column">
-        <!-- Card de Filtros -->
-        <section class="card">
-          <div class="card-header">
-            <h2>2. Regras e Filtros</h2>
-          </div>
-
-          <div class="filter-group">
-            <label class="section-label">Resoluções Permitidas:</label>
-            <div class="checkbox-group">
-              <label class="checkbox-label"><input type="checkbox" id="res4k" checked> <span>4K / UHD</span></label>
-              <label class="checkbox-label"><input type="checkbox" id="res1080p" checked> <span>1080p (FHD)</span></label>
-              <label class="checkbox-label"><input type="checkbox" id="res720p" checked> <span>720p (HD)</span></label>
-              <label class="checkbox-label"><input type="checkbox" id="res480p" checked> <span>480p / SD</span></label>
-            </div>
-          </div>
-
-          <div class="filter-group">
-            <label class="section-label">Qualidade & Limpeza:</label>
-            <div class="toggle-group">
-              <label class="toggle-label">
-                <input type="checkbox" id="filterRemoveCams" checked>
-                <span class="toggle-slider"></span>
-                <span>Ocultar gravações de cinema (CAM, TeleSync, Screener)</span>
-              </label>
-              <label class="toggle-label">
-                <input type="checkbox" id="filterDeduplicate" checked>
-                <span class="toggle-slider"></span>
-                <span>Desduplicar releases idênticos (mesmo torrent/hash)</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="filter-group">
-            <label class="section-label">Idiomas de Legendas (Prioridade):</label>
-            <div class="checkbox-group">
-              <label class="checkbox-label"><input type="checkbox" id="subPob" checked> <span>Português Brasil (pob)</span></label>
-              <label class="checkbox-label"><input type="checkbox" id="subPor" checked> <span>Português Portugal (por)</span></label>
-              <label class="checkbox-label"><input type="checkbox" id="subEng" checked> <span>Inglês (eng)</span></label>
-              <label class="checkbox-label"><input type="checkbox" id="subSpa"> <span>Espanhol (spa)</span></label>
-            </div>
-          </div>
-
-          <div class="filter-group">
-            <label class="section-label" for="filterRegex">Excluir por Termos ou Regex:</label>
-            <input type="text" id="filterRegex" class="input-text" placeholder="Ex: \b(ita|hindi|telesync)\b">
-            <small class="help-text">Streams contendo esses termos no título ou descrição serão ignorados.</small>
-          </div>
-
-          <div class="filter-row">
-            <div class="filter-col">
-              <label class="section-label" for="maxStreamsPerAddon">Máx streams por addon:</label>
-              <input type="number" id="maxStreamsPerAddon" class="input-number" min="1" max="50" value="10">
-            </div>
-            <div class="filter-col">
-              <label class="section-label" for="maxTotalStreams">Máx total de streams:</label>
-              <input type="number" id="maxTotalStreams" class="input-number" min="1" max="100" value="30">
-            </div>
-          </div>
-
-          <div class="filter-group">
-            <label class="section-label" for="badgeFormat">Identificação do Provedor:</label>
-            <select id="badgeFormat" class="select-input">
-              <option value="addon">Destacar com [Nome do Addon]</option>
-              <option value="clean">Título limpo (original do scraper)</option>
-            </select>
-          </div>
-        </section>
-
-        <!-- Card de Instalação e Links -->
-        <section class="card highlight-card">
-          <div class="card-header flex-header">
-            <div>
-              <h2>3. Instalar no Stremio & Sincronização Direta</h2>
-              <p class="card-desc">Instale uma única vez. Ao editar addons, catálogos ou coleções neste perfil, todos os seus dispositivos atualizam <strong>automaticamente</strong> sem precisar reinstalar!</p>
-            </div>
-            <div class="url-mode-badges">
-              <span class="badge" style="background:var(--success); color:#000; font-weight:700;">✓ Sincronização Ativa</span>
-            </div>
-          </div>
-
-          <div class="install-actions">
-            <a id="btnInstallStremio" href="#" class="btn btn-stremio btn-large">
-              🎬 Instalar no Stremio
-            </a>
-            <button type="button" id="btnCopyUrl" class="btn btn-secondary btn-large">
-              📋 Copiar Manifest Curto
-            </button>
-          </div>
-
-          <div class="manifest-preview">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <label class="section-label" style="margin:0;">URL Curta do Perfil (Fixa & Sincronizada):</label>
-              <button type="button" id="btnToggleUrlType" class="btn-link-action" style="font-size:11px; background:none; border:none; color:var(--primary); cursor:pointer; text-decoration:underline;">
-                Alternar para URL Portátil (com Token)
-              </button>
-            </div>
-            <div class="url-box">
-              <input type="text" id="manifestUrlDisplay" readonly value="">
-            </div>
-            <small style="color:var(--text-muted); font-size:11px; margin-top:4px; display:block;">
-              💡 Dica: Esta URL limpa tem menos de 50 caracteres e atualiza automaticamente na sua TV ao salvar.
-            </small>
-          </div>
-        </section>
-      </div>
-    </main>
-    </div>
-
-    <!-- Aba 2: Catálogos & Home Studio -->
-    <div id="tabContentCatalogs" class="tab-content">
-      <div class="catalogs-studio">
-        <!-- Topo da Central de Catálogos -->
-        <section class="card">
-          <div class="card-header flex-header">
-            <div>
-              <h2>📚 Studio de Catálogos & Coleções (Stremio & Nuvio)</h2>
-              <p class="card-desc">Gerencie as linhas de filmes e séries para a tela inicial do Stremio e para a <strong>interface de Coleções do Nuvio</strong>. Reordene via arrastar e soltar, renomeie, filtre ou <strong>mescle catálogos de diferentes addons em uma única coleção inteligente</strong>.</p>
-            </div>
-            <div class="studio-actions">
-              <button type="button" class="btn btn-secondary" id="btnSyncCatalogs" title="Importar os catálogos dos addons cadastrados">
-                🔄 Sincronizar dos Addons
-              </button>
-              <button type="button" class="btn btn-primary" id="btnNewMergedCatalog">
-                ✨ + Criar Catálogo / Coleção Mesclada
-              </button>
-            </div>
-          </div>
-
-          <!-- Dica explicativa -->
-          <div class="studio-banner">
-            <div class="banner-icon">💡</div>
-            <div class="banner-text">
-              <strong>Compatibilidade Nuvio & Stremio:</strong> A opção <strong>"🏠 Na Home"</strong> exibe o catálogo diretamente na tela inicial. Ao desativá-la (<strong>"Fora da Home"</strong>), o catálogo sai da Home do Stremio/Nuvio, mas permanece disponível na <strong>Central de Coleções / Explorar</strong> do Nuvio com o padrão <code>showInHome: false</code>!
-            </div>
-          </div>
-
-          <!-- Barra de Ações Rápidas em Massa -->
-          <div class="catalog-bulk-toolbar">
-            <div class="bulk-toolbar-info">
-              <span class="bulk-toolbar-title">⚡ <strong>Ações em Massa:</strong></span>
-              <span class="bulk-toolbar-hint">Controle todos os catálogos com 1 clique</span>
-            </div>
-            <div class="bulk-toolbar-buttons">
-              <button type="button" class="btn btn-bulk btn-bulk-enable" id="btnEnableAllCatalogs" title="Ativar todos os catálogos na agregação">
-                👁️ Ativar Todos
-              </button>
-              <button type="button" class="btn btn-bulk btn-bulk-disable" id="btnDisableAllCatalogs" title="Desativar todos os catálogos da agregação">
-                🚫 Desativar Todos
-              </button>
-              <span class="bulk-divider"></span>
-              <button type="button" class="btn btn-bulk btn-bulk-home" id="btnHomeAllCatalogs" title="Exibir todos os catálogos na Home do Stremio e Nuvio">
-                🏠 Exibir Todos na Home
-              </button>
-              <button type="button" class="btn btn-bulk btn-bulk-hide-home" id="btnHideHomeAllCatalogs" title="Ocultar todos da Home (mantendo visíveis nas Coleções do Nuvio)">
-                📦 Ocultar Todos da Home
-              </button>
-            </div>
-          </div>
-
-          <!-- Lista de Catálogos -->
-          <div class="catalog-list-container" id="catalogListContainer">
-            <div class="catalog-list-header">
-              <span>Ordem & Nome de Exibição</span>
-              <span>Ações & Prioridade</span>
-            </div>
-            <div class="catalog-items-list" id="catalogItemsList">
-              <div class="empty-state" id="catalogEmptyState">
-                Nenhum catálogo configurado ainda. Clique em "🔄 Sincronizar dos Addons" para importar as linhas dos seus addons ativos!
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-
-    <!-- Aba 3: Coleções Nuvio (Nuvio Collections Studio) -->
-    <div id="tabContentCollections" class="tab-content">
-      <div class="collections-studio">
-        <section class="card">
-          <div class="card-header flex-header">
-            <div>
-              <h2>✨ Central de Coleções para o Nuvio</h2>
-              <p class="card-desc">Crie e edite as coleções no formato nativo do <strong>Nuvio (Categorias, Pastas, Capas, Emojis e Layouts como TABBED_GRID / POSTER / LANDSCAPE)</strong>. Você pode carregar o JSON exemplo ou colar e editar sua estrutura personalizada.</p>
-            </div>
-            <div class="studio-actions">
-              <button type="button" class="btn btn-secondary" id="btnLoadSampleCollections" title="Carregar a estrutura modelo de coleções (Trending, Streaming, Gêneros, Décadas, etc)">
-                📦 Carregar Exemplo Completo
-              </button>
-              <button type="button" class="btn btn-secondary" id="btnCopyCollectionsJson" title="Copiar o JSON completo das coleções">
-                📋 Copiar JSON
-              </button>
-              <button type="button" class="btn btn-secondary" id="btnDownloadCollectionsJson" title="Baixar collections.json para importar no Nuvio">
-                💾 Baixar collections.json
-              </button>
-              <button type="button" class="btn btn-primary" id="btnNewCategory">
-                ✨ + Nova Categoria
-              </button>
-            </div>
-          </div>
-
-          <div class="studio-banner">
-            <div class="banner-icon">📱</div>
-            <div class="banner-text" style="flex: 1;">
-              <strong>Integração com o Nuvio:</strong> O seu agregador disponibiliza a URL direta de <code>collections.json</code>. Você pode usá-la nas configurações do Nuvio ou importar/editar visualmente cada pasta e capa:
-              <div class="url-box" style="margin-top: 8px; display: flex; gap: 8px;">
-                <input type="text" id="collectionsUrlDisplay" readonly value="" style="flex: 1; padding: 6px 10px; font-size: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 6px; color: var(--text);">
-                <button type="button" class="btn btn-secondary btn-small" id="btnCopyCollectionsUrl">📋 Copiar Link</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Modos de Visualização: Visual / JSON Code -->
-          <div class="collections-mode-toggle">
-            <button type="button" class="btn-mode active" id="btnModeVisual" onclick="window.switchCollectionsMode('visual')">🎨 Editor Visual</button>
-            <button type="button" class="btn-mode" id="btnModeJson" onclick="window.switchCollectionsMode('json')">{ } Editor JSON</button>
-          </div>
-
-          <!-- Vista Visual -->
-          <div id="collectionsVisualView" class="collections-view">
-            <div id="collectionsCategoryList" class="collections-category-list">
-              <!-- Categorias renderizadas via JS -->
-            </div>
-          </div>
-
-          <!-- Vista JSON Raw -->
-          <div id="collectionsJsonView" class="collections-view" style="display:none;">
-            <div class="json-editor-container">
-              <textarea id="collectionsJsonEditor" class="json-textarea" spellcheck="false" placeholder="Cole seu JSON de coleções do Nuvio aqui..."></textarea>
-              <div class="json-editor-actions">
-                <button type="button" class="btn btn-primary" id="btnApplyJsonCollections">✓ Aplicar Alterações do JSON</button>
-                <span id="jsonEditorFeedback" class="feedback-msg"></span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <p>Stream Aggregator • Compatível com Stremio v2 API, Nuvio e HTTP Players</p>
-    </footer>
-  </div>
-
-  <!-- Modal de Criação/Edição de Catálogo Mesclado -->
-  <div id="mergedCatalogModal" class="modal-backdrop">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 id="modalMergedTitle">✨ Criar Catálogo Mesclado</h3>
-        <button type="button" class="btn-close-modal" id="btnCloseMergedModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="modalMergedId">
-
-        <div class="modal-form-group">
-          <label class="section-label" for="modalMergedName">Nome do Catálogo Unificado:</label>
-          <input type="text" id="modalMergedName" class="input-text" placeholder="Ex: 🔥 Super Populares (CyberFlix + Cinemeta)">
-          <small class="help-text">Esse é o nome da seção que aparecerá na tela inicial do Stremio.</small>
-        </div>
-
-        <div class="modal-form-group">
-          <label class="section-label" for="modalMergedType">Tipo de Mídia:</label>
-          <select id="modalMergedType" class="select-input">
-            <option value="movie">Filmes (movie)</option>
-            <option value="series">Séries (series)</option>
-            <option value="anime">Animes (anime)</option>
-            <option value="other">Outros (other)</option>
-          </select>
-        </div>
-
-        <div class="modal-form-group">
-          <label class="section-label">Selecione os Catálogos Fonte para Mesclar:</label>
-          <div class="merged-sources-checklist" id="mergedSourcesChecklist">
-            <!-- Gerado via Javascript dinamicamente -->
-          </div>
-          <small class="help-text">Os itens desses catálogos serão intercalados (round-robin) e deduplicados por ID do IMDb/TMDB.</small>
-        </div>
-
-        <div id="modalMergedFeedback" class="feedback-msg"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" id="btnCancelMergedModal" class="btn btn-secondary">Cancelar</button>
-        <button type="button" id="btnSaveMergedModal" class="btn btn-primary">Salvar Catálogo Mesclado</button>
-      </div>
+    <div class="workspace" id="workspace">
+      <section id="app" aria-live="polite"><div class="loading"><span class="spinner"></span> Carregando seu espaço de trabalho...</div></section>
     </div>
   </div>
+</div>
 
-  <!-- Modal de Configurações do Addon (Engrenagem ⚙️) -->
-  <div id="addonSettingsModal" class="modal-backdrop">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 id="modalTitle">Configurações do Addon</h3>
-        <button type="button" class="btn-close-modal" id="btnCloseModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="modalAddonId">
-
-        <div class="modal-form-group">
-          <label class="section-label" for="modalAddonName">Nome de Exibição:</label>
-          <input type="text" id="modalAddonName" class="input-text">
-        </div>
-
-        <div class="modal-form-group">
-          <label class="section-label" for="modalAddonUrl">URL do Manifest:</label>
-          <div class="url-edit-wrapper">
-            <textarea id="modalAddonUrl" class="input-textarea" rows="2"></textarea>
-            <button type="button" id="btnModalCopyUrl" class="btn btn-secondary btn-sm" title="Copiar URL">📋 Copiar</button>
-          </div>
-        </div>
-
-        <div class="modal-form-group">
-          <label class="section-label">Recursos Utilizados deste Addon:</label>
-          <div class="checkbox-group" id="modalResourceCheckboxes">
-            <label class="checkbox-label"><input type="checkbox" id="modalResStream" checked> <span>📺 Streams</span></label>
-            <label class="checkbox-label"><input type="checkbox" id="modalResSubtitles" checked> <span>💬 Legendas</span></label>
-            <label class="checkbox-label"><input type="checkbox" id="modalResCatalogs" checked> <span>📚 Catálogos</span></label>
-          </div>
-          <small class="help-text">Você pode desmarcar recursos indesejados (ex: usar um addon apenas para legendas ou apenas para streams).</small>
-        </div>
-
-        <div class="modal-form-group">
-          <label class="section-label" for="modalAddonTimeout">Timeout de Resposta (ms):</label>
-          <input type="number" id="modalAddonTimeout" class="input-number" min="1000" max="35000" step="1000" value="25000">
-          <small class="help-text">Tempo máximo de espera antes de ignorar (padrão: 25000ms para scrapers web).</small>
-        </div>
-
-        <div id="modalTestFeedback" class="feedback-msg"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" id="btnModalTestAddon" class="btn btn-secondary">
-          🔍 Testar Conexão
-        </button>
-        <button type="button" id="btnModalSaveAddon" class="btn btn-primary">
-          💾 Salvar Alterações
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal de Edição de Pasta de Coleção Nuvio -->
-  <div id="nuvioFolderModal" class="modal-backdrop">
-    <div class="modal-card" style="max-width: 680px;">
-      <div class="modal-header">
-        <h3 id="nuvioFolderModalTitle">📁 Editar Pasta da Coleção</h3>
-        <button type="button" class="btn-close-modal" id="btnCloseFolderModal">&times;</button>
-      </div>
-      <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
-        <input type="hidden" id="modalFolderCatId">
-        <input type="hidden" id="modalFolderId">
-
-        <div class="modal-form-group">
-          <label class="section-label" for="modalFolderTitle">Título da Pasta / Hub:</label>
-          <input type="text" id="modalFolderTitle" class="input-text" placeholder="Ex: 🔥 Em Alta, Marvel, Netflix, Terror">
-        </div>
-
-        <div class="filter-row">
-          <div class="filter-col">
-            <label class="section-label" for="modalFolderEmoji">Emoji / Ícone:</label>
-            <input type="text" id="modalFolderEmoji" class="input-text" placeholder="Ex: 🎬, 🔥, 🍿, ⏳">
-          </div>
-          <div class="filter-col">
-            <label class="section-label" for="modalFolderTileShape">Formato do Card (Tile Shape):</label>
-            <select id="modalFolderTileShape" class="select-input">
-              <option value="LANDSCAPE">Landscape (16:9 Banner Horizontal)</option>
-              <option value="POSTER">Poster (2:3 Cartaz Vertical)</option>
-              <option value="SQUARE">Square (1:1 Quadrado)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Capas e Imagens / Artwork -->
-        <div class="modal-form-group">
-          <label class="section-label" for="modalFolderCoverUrl">URL da Imagem de Capa (Cover Image):</label>
-          <input type="text" id="modalFolderCoverUrl" class="input-text" placeholder="https://exemplo.com/poster.jpg">
-          <div class="artwork-presets-box">
-            <span style="font-size:11px;color:var(--text-muted);">Presets Populares:</span>
-            <div class="preset-buttons" style="margin-top:4px;">
-              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/streaming_services.netflix.webp')">Netflix</button>
-              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/streaming_services.prime_video.webp')">Prime</button>
-              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/streaming_services.disney_plus.webp')">Disney+</button>
-              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/streaming_services.hbo_max.webp')">HBO Max</button>
-              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/studios.marvel.webp?v=7')">Marvel</button>
-              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/studios.dc.webp?v=7')">DC</button>
-              <button type="button" class="btn-preset btn-preset-sm" onclick="window._setFolderCoverPreset('https://cdn.xperience-app.com/covers/default/studios.pixar.webp?v=7')">Pixar</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Animação GIF / Focus Effect -->
-        <div class="modal-form-group">
-          <label class="section-label" for="modalFolderFocusGifUrl">URL de Animação em Foco (Focus GIF URL):</label>
-          <input type="text" id="modalFolderFocusGifUrl" class="input-text" placeholder="https://exemplo.com/animacao.gif">
-          <small class="help-text">Ao passar o cursor/controle no Nuvio, reproduz esse GIF animado.</small>
-        </div>
-
-        <div class="checkbox-group" style="margin-top: 4px;">
-          <label class="checkbox-label"><input type="checkbox" id="modalFolderFocusGifEnabled" checked> <span>Habilitar Animação em Foco (Focus GIF Enabled)</span></label>
-          <label class="checkbox-label"><input type="checkbox" id="modalFolderHideTitle" checked> <span>Ocultar Texto se a Capa já tiver Título</span></label>
-        </div>
-
-        <!-- Fontes e Catálogos Vinculados -->
-        <div class="modal-form-group" style="margin-top: 10px;">
-          <div class="flex-between">
-            <label class="section-label">Fontes & Catálogos Conectados a esta Pasta:</label>
-            <span class="catalog-tag-type" id="modalFolderSourcesCount">0 fontes</span>
-          </div>
-          <small class="help-text">Selecione quais catálogos dos seus addons ativos alimentarão esta pasta no Nuvio:</small>
-          <div class="folder-sources-checklist" id="folderSourcesChecklist">
-            <!-- Checkboxes preenchidos via JS -->
-          </div>
-        </div>
-
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" id="btnCancelFolderModal">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="btnSaveFolderModal">💾 Salvar Pasta</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal de Edição de Categoria Nuvio -->
-  <div id="nuvioCategoryModal" class="modal-backdrop">
-    <div class="modal-card" style="max-width: 520px;">
-      <div class="modal-header">
-        <h3 id="nuvioCatModalTitle">🏷️ Configurar Categoria</h3>
-        <button type="button" class="btn-close-modal" id="btnCloseCatModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="modalCatId">
-        <div class="modal-form-group">
-          <label class="section-label" for="modalCatTitle">Nome da Categoria:</label>
-          <input type="text" id="modalCatTitle" class="input-text" placeholder="Ex: Streaming, Gêneros, Estúdios">
-        </div>
-        <div class="modal-form-group">
-          <label class="section-label" for="modalCatViewMode">Modo de Visualização (View Mode):</label>
-          <select id="modalCatViewMode" class="select-input">
-            <option value="TABBED_GRID">TABBED_GRID (Abas Superiores + Grid)</option>
-            <option value="ROW">ROW (Carrossel Horizontal de Linhas)</option>
-            <option value="GRID">GRID (Grade Direta)</option>
-          </select>
-        </div>
-        <div class="checkbox-group">
-          <label class="checkbox-label"><input type="checkbox" id="modalCatFocusGlow" checked> <span>Efeito de Brilho em Foco (Focus Glow)</span></label>
-          <label class="checkbox-label"><input type="checkbox" id="modalCatPinToTop"> <span>Fixar no Topo da Tela (Pin to Top)</span></label>
-          <label class="checkbox-label"><input type="checkbox" id="modalCatShowAllTab"> <span>Exibir Aba "Ver Tudo" (Show All Tab)</span></label>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" id="btnCancelCatModal">Cancelar</button>
-        <button type="button" class="btn btn-primary" id="btnSaveCatModal">💾 Salvar Categoria</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast notification -->
-  <div id="toast" class="toast"></div>
-
-  <script src="app.js"></script>
+<div id="modal" class="modal-backdrop" hidden aria-hidden="true">
+ <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+   <div class="modal-head"><h2 id="modalTitle">Editor</h2><button id="modalClose" class="icon-button" type="button" aria-label="Fechar">✕</button></div>
+   <div id="modalContent" class="modal-content"></div>
+   <div id="modalActions" class="modal-actions"></div>
+ </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

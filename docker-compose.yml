@@ -5,11 +5,24 @@ services:
       dockerfile: Dockerfile
     container_name: stream-aggregator
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: "0.5"
+    pids_limit: 128
     ports:
-      - "${PORT:-7001}:7001"
+      - "127.0.0.1:${PORT:-7001}:7001"
     environment:
       - PORT=7001
       - NODE_ENV=production
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - TRAKT_CLIENT_ID=${TRAKT_CLIENT_ID:-}
+      - MDBLIST_API_KEY=${MDBLIST_API_KEY:-}
     volumes:
       - ./data:/app/data
     logging:
@@ -19,9 +32,20 @@ services:
         max-file: "3"
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared@sha256:6b599ca3e974349ead3286d178da61d291961182ec3fe9c505e1dd02c8ac31b0
     container_name: stream-aggregator-tunnel
     restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: "0.25"
+    pids_limit: 128
     command: tunnel --config /etc/cloudflared/config.yml run
     volumes:
       - ./cloudflared:/etc/cloudflared:ro

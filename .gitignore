@@ -8,3 +8,54 @@ coverage/
 cloudflared/*.json
 cloudflared/credentials.json
 
+
+# Dados privados do gerenciador de catálogos (nunca publicar tokens nem cache)
+data/catalog-bridge.json
+data/catalog-bridge-admin.token
+data/catalog-bridge-cache.json
+data/backup-*/
+# Cinebra Studio: personalizacoes locais e historico
+/data/cinebra-studio.json
+/data/cinebra-studio-history.json
+/data/cinebra-studio-upstream.json
+
+# WebP preparado para o Nuvio, indice local e cache
+/data/cover-adapter/
+
+# JSONs enviados manualmente ao Cinebra Studio, preservados somente no PC
+/data/studio-import.json
+/data/studio-import-backups/
+
+# Provedores privados de publicacao Nuvio (URLs podem conter tokens)
+/data/nuvio-publication-providers.json
+/data/addon-visuals.json
+
+# Chaves da API centralizadas: nunca enviar ao Git
+/data/hub-integrations.json
+
+# Conexões pessoais e tokens por fonte
+/data/hub-source-accounts.json
+
+# Preferências e token ERDB
+/data/hub-artwork-erdb.json
+
+# Perfis armazenam URLs privados de addons
+/data/profiles.json
+
+# Banco local, tokens, backups e configurações de perfis (nunca enviar ao GitHub)
+/data/
+
+# Checkpoints internos com ambiente e histórico de auditoria
+/docs/
+
+# Tunnel privado: IDs, hostnames e caminhos locais
+/cloudflared/config.yml
+
+# Chave privada de execução do Cloudflare Tunnel
+/cloudflared/credentials.json
+
+# Certificados locais
+/cloudflared/*.pem
+
+# Relatórios locais de segurança
+/.github-secrets-audit/

@@ -1,4 +1,5 @@
 import { parseAddonUrl, DEFAULT_FETCH_HEADERS } from './url-helper.js';
+import { recordSearch, recordSearchDelivery } from './monitor.js';
 
 // Cache LRU em memória para legendas (30s)
 class SimpleSubtitleCache {
@@ -46,15 +47,22 @@ export function normalizeLang(lang) {
  * Consulta legendas de um addon com timeout.
  */
 async function fetchAddonSubtitles(addon, type, id, extra = '') {
+  const started = Date.now();
   const parsed = parseAddonUrl(addon.url);
-  if (!parsed) return [];
+  const report = (status, count = 0, httpStatus = null) => recordSearch(addon, {
+    status, count, httpStatus, durationMs: Date.now() - started,
+    resource: 'subtitles'
+  });
+  if (!parsed) {
+    report('invalid_url');
+    return [];
+  }
 
   const subUrl = parsed.getSubtitleUrl(type, id, extra);
-  const timeoutMs = addon.timeoutMs || 10000;
-
+  const timeoutMs = Number.isInteger(addon.requestTimeoutMs)
+    ? Math.min(Math.max(addon.requestTimeoutMs,3000),30000) : 7500;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  const startTime = Date.now();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(subUrl, {
@@ -62,30 +70,26 @@ async function fetchAddonSubtitles(addon, type, id, extra = '') {
       headers: DEFAULT_FETCH_HEADERS,
       redirect: 'follow'
     });
-
-    clearTimeout(timeoutId);
-    const elapsed = Date.now() - startTime;
-
     if (!res.ok) {
-      console.warn(`[Subtitles: ${addon.name}] HTTP ${res.status} após ${elapsed}ms`);
+      report('http_error', 0, res.status);
       return [];
     }
-
     const data = await res.json();
-    if (!data || !Array.isArray(data.subtitles)) {
+    if (!Array.isArray(data?.subtitles)) {
+      report('invalid_response');
       return [];
     }
-
-    console.log(`[Subtitles: ${addon.name}] ✅ ${data.subtitles.length} legendas recebidas em ${elapsed}ms`);
+    report(data.subtitles.length ? 'results' : 'empty', data.subtitles.length);
     return data.subtitles.map(sub => ({
       ...sub,
       lang: normalizeLang(sub.lang),
       id: sub.id || `${addon.name}-${Math.random().toString(36).slice(2, 8)}`
     }));
   } catch (err) {
-    clearTimeout(timeoutId);
-    console.warn(`[Subtitles: ${addon.name}] Falha ou timeout: ${err.message}`);
+    report(controller.signal.aborted || err?.name === 'AbortError' ? 'timeout' : 'network_error');
     return [];
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -112,9 +116,13 @@ export async function aggregateSubtitles(config, type, id, extra = '') {
   const settled = await Promise.allSettled(promises);
 
   let allSubtitles = [];
-  for (const item of settled) {
+  const subtitleSources = new WeakMap();
+  for (const [index, item] of settled.entries()) {
     if (item.status === 'fulfilled' && Array.isArray(item.value)) {
-      allSubtitles.push(...item.value);
+      for (const sub of item.value) {
+        subtitleSources.set(sub, subtitleAddons[index].url);
+        allSubtitles.push(sub);
+      }
     }
   }
 
@@ -142,6 +150,9 @@ export async function aggregateSubtitles(config, type, id, extra = '') {
     return prioA - prioB;
   });
 
+  for (const addon of subtitleAddons) {
+    recordSearchDelivery(addon, deduplicated.filter(sub => subtitleSources.get(sub) === addon.url).length);
+  }
   const result = { subtitles: deduplicated };
   subtitleCache.set(cacheKey, result);
   return result;
