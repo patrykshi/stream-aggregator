@@ -2,6 +2,7 @@
 import { spawn } from 'node:child_process';
 import sharp from 'sharp';
 import {getIntegrationKey} from '../config/hub-integrations.js';
+import {customMosaicGroups,getCustomMosaicCategory} from './mosaic-categories.js';
 import {getStudioShapeSpec,saveDataUrlArtwork,applyUploadedMark,buildOverlaySvg} from './artwork-studio.js';
 
 const BRIDGE='/app/python-mosaic/bridge.py';
@@ -36,7 +37,12 @@ export async function getOriginalMosaicCategories({runner=runOriginalMosaic}={})
  if(!originalMosaicStatus().configured)
   return {groups:{},...originalMosaicStatus()};
  const result=await runner({operation:'list'});
- return {...originalMosaicStatus(),groups:result.groups||{}};
+ const custom=customMosaicGroups();
+ const groups=Object.fromEntries(Object.entries(result.groups||{}).map(([k,entries])=>[k,[
+   ...entries.map(entry=>({...entry,custom:false})),
+   ...(custom[k]||[]).filter(c=>!entries.some(e=>e.name===c.name)).map(c=>({...c,custom:true}))
+ ]]));
+ return {...originalMosaicStatus(),groups};
 }
 export async function composeOriginalMosaic(options,{runner=runOriginalMosaic}={}){
  if(!originalMosaicStatus().configured){const err=Error('Mosaicos originais TMDB não configurados no PC.');err.status=503;throw err;}
@@ -47,7 +53,9 @@ export async function composeOriginalMosaic(options,{runner=runOriginalMosaic}={
  const spec=getStudioShapeSpec(options.shape);
  const cards=Number(options.cards||16);
  if(![12,16,20,28].includes(cards))throw Error('Quantidade de imagens inválida.');
- const result=await runner({operation:'create',tmdbKey,group:options.group,category:options.category,cards});
+ const definition=getCustomMosaicCategory(options.group,options.category);
+ const result=await runner({operation:'create',tmdbKey,group:options.group,category:options.category,cards,
+  ...(definition?{customCategory:definition}:{})});
  if(typeof result.data!=='string'||result.data.length>12_000_000)
   throw Error('O renderizador original não retornou uma imagem válida.');
  const raw=Buffer.from(result.data,'base64');
@@ -57,6 +65,7 @@ export async function composeOriginalMosaic(options,{runner=runOriginalMosaic}={
  const badge=typeof options.badge==='string'?options.badge.slice(0,8):'';
  let img=await sharp(raw,{limitInputPixels:25_000_000,animated:false})
   .resize(spec.width,spec.height,{fit:'cover',position:'attention'}).webp({quality:87}).toBuffer();
+ const baseDataUrl='data:image/webp;base64,'+img.toString('base64');
  if(title||subtitle||badge){
   const overlay=buildOverlaySvg({width:spec.width,height:spec.height,
    title,subtitle,badge,primary:'#162233',secondary:'#080b12',accent:'#b9dcf9',
@@ -68,7 +77,7 @@ export async function composeOriginalMosaic(options,{runner=runOriginalMosaic}={
  const dataUrl='data:image/webp;base64,'+img.toString('base64');
  if(options.save===false)return {ok:true,provider:'tmdb-original-python',
   category:options.category,cards:result.cards,shape:spec.key,tileShape:spec.tileShape,
-  width:spec.width,height:spec.height,dataUrl};
+  width:spec.width,height:spec.height,dataUrl,baseDataUrl};
  return {ok:true,provider:'tmdb-original-python',category:options.category,cards:result.cards,
   ...(await saveDataUrlArtwork(dataUrl,{shape:spec.key,title,mode:'tmdb-original-python'})),dataUrl};
 }

@@ -246,29 +246,41 @@ export function buildOverlaySvg({
   const isVertical = height > width;
   const isSquare = width === height;
 
-  const cleanTitle = escapeXml(String(title || '').trim().toUpperCase().slice(0, 38));
-  const cleanSub = escapeXml(String(subtitle || '').trim().toUpperCase().slice(0, 64));
-  const cleanBadge = escapeXml(String(badge || '').trim().slice(0, 8));
-
-  const titleFontSize = isVertical
-    ? (cleanTitle.length > 14 ? Math.round(width * 0.088) : Math.round(width * 0.115))
-    : isSquare
-      ? (cleanTitle.length > 14 ? Math.round(width * 0.085) : Math.round(width * 0.11))
-      : (cleanTitle.length > 16 ? Math.round(height * 0.105) : Math.round(height * 0.135));
-
-  const subFontSize = Math.max(13, Math.round(titleFontSize * 0.26));
-  const badgeBoxSize = Math.round(Math.min(width, height) * (isVertical ? 0.22 : isSquare ? 0.24 : 0.23));
-  const badgeFontSize = Math.round(badgeBoxSize * (cleanBadge.length > 2 ? 0.34 : 0.48));
-
-  const centerX = Math.round(width / 2);
-  const centerY = Math.round(height / 2);
-  const bottomY = isVertical ? Math.round(height * 0.84) : Math.round(height * 0.80);
-
+  // Allow typography to survive edits: adaptive line-breaking before SVG rendering.
+  // An upper bound on measured glyph count prevents text from clipping off-canvas.
+  const fitLines = (raw, maxChars, maxLines=2) => {
+    const words=String(raw || '').trim().toUpperCase().slice(0,160).split(/\s+/).filter(Boolean);
+    const lines=[];let row='';
+    for(const word of words){
+      const candidate=row ? row+' '+word : word;
+      if(candidate.length<=maxChars){row=candidate;continue;}
+      if(row){lines.push(row);row='';}
+      if(word.length>maxChars){
+        const chunks=word.match(new RegExp('.{1,'+maxChars+'}', 'g'))||[];
+        lines.push(...chunks.slice(0,Math.max(0,maxLines-lines.length)));
+      }else row=word;
+      if(lines.length>=maxLines)break;
+    }
+    if(row&&lines.length<maxLines)lines.push(row);
+    return lines.slice(0,maxLines).map(escapeXml);
+  };
+  const base=Math.min(width,height);
+  const titleFontSize=Math.round(base*(height>width?0.078:0.106));
+  const subFontSize=Math.round(base*(height>width?0.032:0.040));
+  const titleLimit=Math.max(11,Math.floor(width/(titleFontSize*.65)));
+  const subtitleLimit=Math.max(14,Math.floor(width/(subFontSize*.72)));
+  const titleLines=fitLines(title,titleLimit,2);
+  const subtitleLines=fitLines(subtitle,subtitleLimit,2);
+  const cleanBadge=escapeXml(String(badge||'').trim().slice(0,8));
+  const badgeBoxSize=Math.round(base*(height>width?0.20:0.22));
+  const badgeFontSize=Math.round(badgeBoxSize*(cleanBadge.length>2?0.34:0.48));
+  const centerX=Math.round(width/2),centerY=Math.round(height/2);
+  const bottomY=Math.round(height*(height>width?0.84:0.83));
   let backgroundElements = '';
   if (mode === 'preset' || mode === 'ai-procedural') {
     backgroundElements = `
       <rect width="${width}" height="${height}" fill="url(#bgGrad)" />
-      <circle cx="${centerX}" cy="${Math.round(height * 0.42)}" r="${Math.round(Math.max(width, height) * 0.55)}" fill="url(#radialGlow)" />
+      ${pattern==='plain'||pattern==='diagonal'?'':`<circle cx="${centerX}" cy="${Math.round(height * 0.42)}" r="${Math.round(Math.max(width, height) * (pattern==='radial'?0.75:0.55))}" fill="url(#radialGlow)" />`}
       ${pattern === 'rays' ? `
         <polygon points="0,0 ${Math.round(width * 0.45)},0 ${ width },${ height } ${Math.round(width * 0.55)},${ height }" fill="${cAccent}" fill-opacity="0.07" />
         <polygon points="${Math.round(width * 0.65)},0 ${ width },0 ${Math.round(width * 0.35)},${ height } 0,${ height }" fill="${cPrimary}" fill-opacity="0.09" />
@@ -296,16 +308,21 @@ export function buildOverlaySvg({
       </g>`
     : '';
 
-  const textBlock = !hideTitle && cleanTitle
-    ? `<g>
-        ${cleanSub ? `<text x="${centerX}" y="${bottomY - titleFontSize - 10}" text-anchor="middle" fill="${cAccent}" font-family="Manrope, system-ui, sans-serif" font-weight="800" font-size="${subFontSize}" letter-spacing="0.22em">${cleanSub}</text>` : ''}
-        <text x="${centerX}" y="${bottomY}" text-anchor="middle" fill="#ffffff" font-family="Manrope, system-ui, sans-serif" font-weight="900" font-size="${titleFontSize}" letter-spacing="0.04em">${cleanTitle}</text>
-      </g>`
-    : '';
+  const textBlock= !hideTitle && (titleLines.length || subtitleLines.length)
+    ? `<g font-family="DejaVu Sans, sans-serif" text-anchor="middle" paint-order="stroke">
+       ${titleLines.map((line,i)=>`<text x="${centerX}" y="${bottomY-(titleLines.length-1-i)*(titleFontSize*1.14)}"
+         fill="#ffffff" stroke="#07111e" stroke-opacity=".9" stroke-width="${Math.max(2,Math.round(titleFontSize*.055))}"
+         stroke-linejoin="round" font-weight="bold" font-size="${titleFontSize}"
+         textLength="${Math.min(width*.88,Math.max(10,line.length*titleFontSize*.61))}" lengthAdjust="spacingAndGlyphs">${line}</text>`).join('')}
+       ${subtitleLines.map((line,i)=>`<text x="${centerX}" y="${bottomY-titleLines.length*titleFontSize*1.22-subtitleLines.length*subFontSize*1.15+i*subFontSize*1.20}"
+         fill="${cAccent}" stroke="#07111e" stroke-opacity=".94" stroke-width="2"
+         font-weight="bold" font-size="${subFontSize}"
+         textLength="${Math.min(width*.84,Math.max(10,line.length*subFontSize*.64))}" lengthAdjust="spacingAndGlyphs">${line}</text>`).join('')}
+      </g>` : '';
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
     <defs>
-      <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <linearGradient id="bgGrad" x1="0%" y1="0%" x2="${pattern==='plain'?'100%':'100%'}" y2="${pattern==='plain'?'0%':'100%'}">
         <stop offset="0%" stop-color="${cSecondary}" />
         <stop offset="55%" stop-color="${cPrimary}" stop-opacity="0.48" />
         <stop offset="100%" stop-color="#05070c" />
@@ -328,6 +345,27 @@ export function buildOverlaySvg({
     ${badgeElement}
     ${textBlock}
   </svg>`;
+}
+
+export async function decorateStudioBase({baseDataUrl,shape='LANDSCAPE',title='',subtitle='',badge='',
+  hideTitle=false,logoDataUrl='',accent='#99dafc',save=false}={}){
+  const spec=getStudioShapeSpec(shape);
+  if(typeof baseDataUrl!=='string'||baseDataUrl.length>16_000_000||
+     !/^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$/.test(baseDataUrl))
+     throw Error('Imagem de fundo gerada inválida.');
+  const input=Buffer.from(baseDataUrl.split(',')[1],'base64');
+  if(input.length<100 || input.length>12*1024*1024)throw Error('Imagem de fundo excede o limite de 12 MB.');
+  let webp=await sharp(input,{limitInputPixels:45_000_000,animated:false})
+    .resize(spec.width,spec.height,{fit:'cover',position:'centre'}).webp({quality:88}).toBuffer();
+  const overlay=buildOverlaySvg({width:spec.width,height:spec.height,title,subtitle,badge,
+   primary:'#182b42',secondary:'#060c15',accent,hideTitle,mode:'mosaic'});
+  webp=await sharp(webp).composite([{input:Buffer.from(overlay),left:0,top:0}])
+   .webp({quality:88}).toBuffer();
+  webp=await applyUploadedMark(webp,logoDataUrl,spec.width,spec.height);
+  const dataUrl='data:image/webp;base64,'+webp.toString('base64');
+  if(!save)return {ok:true,shape:spec.key,tileShape:spec.tileShape,
+    width:spec.width,height:spec.height,dataUrl};
+  return {ok:true,...await saveStudioArtworkBuffer(webp,{shape:spec.key,title,mode:'decorated'}),dataUrl};
 }
 
 export async function applyUploadedMark(base, logoDataUrl, width, height) {
@@ -561,6 +599,8 @@ export async function generateAiStudioArtwork({
   }
   if(imgPart.inlineData.data.length>15_000_000)throw Error('Imagem Gemini acima do limite permitido.');
   const rawBuf=Buffer.from(imgPart.inlineData.data,'base64');
+  const baseDataUrl='data:image/webp;base64,'+(await sharp(rawBuf,{limitInputPixels:45_000_000,animated:false})
+     .resize(spec.width,spec.height,{fit:'cover',position:'centre'}).webp({quality:88}).toBuffer()).toString('base64');
   const overlaySvg=buildOverlaySvg({width:spec.width,height:spec.height,
     title,subtitle,badge,primary:styleSpec.primary,secondary:styleSpec.secondary,
     accent:styleSpec.accent,hideTitle:Boolean(hideTitle),mode:'mosaic',pattern:styleSpec.pattern});
@@ -571,7 +611,7 @@ export async function generateAiStudioArtwork({
   composed=await applyUploadedMark(composed,logoDataUrl,spec.width,spec.height);
   const dataUrl=`data:image/webp;base64,${composed.toString('base64')}`;
   if(!save)return {ok:true,provider:'gemini',shape:spec.key,tileShape:spec.tileShape,
-    width:spec.width,height:spec.height,dataUrl};
+    width:spec.width,height:spec.height,dataUrl,baseDataUrl};
   const saved=await saveStudioArtworkBuffer(composed,{shape:spec.key,title,mode:'ai-gemini'});
   return {ok:true,provider:'gemini',...saved,dataUrl};
 }

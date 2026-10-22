@@ -150,13 +150,57 @@ try {
   assert.equal(requests.some(x=>x.path==='/api/hub/artwork/generate-ai'),false,
     'AI billing must only happen after explicit click');
   assert.match(await ev("document.querySelector('#artPaneAi').innerText"),/Gemini/);
+  // Simulate a returned mosaic without TMDB network or writing into the live library.
+  await ev(`(()=>{
+    window.__qaMosaicCalls=0;
+    window.__qaOriginalFetch=window.fetch.bind(window);
+    window.fetch=async(url,init)=>{
+      if(String(url).includes('/api/hub/artwork/mosaic-compose')){
+        window.__qaMosaicCalls++;
+        const cv=document.createElement('canvas');cv.width=480;cv.height=270;
+        const cx=cv.getContext('2d');cx.fillStyle='#224466';cx.fillRect(0,0,480,270);
+        cx.fillStyle='#afeecc';cx.fillRect(28,32,200,130);
+        const base=cv.toDataURL('image/png');
+        return new Response(JSON.stringify({ok:true,provider:'tmdb-original-python',
+         shape:'LANDSCAPE',tileShape:'LANDSCAPE',width:1280,height:720,
+         baseDataUrl:base,dataUrl:base}),{status:200,headers:{'Content-Type':'application/json'}});
+      }
+      return window.__qaOriginalFetch(url,init);
+    };
+  })()`);
   await click('[data-art-mode=original-mosaic]');
   await wait(() => ev("!document.querySelector('#artPaneOriginalMosaic').hidden"), 'original TMDB mosaics');
   assert.equal(await ev("!!document.querySelector('#artMosaicCategory')"),true);
-  assert.equal(await ev("!!document.querySelector('#artGenerateMosaicBtn')"),true);
+  assert.equal(await ev("!!document.querySelector('#artMosaicSearchQuery')"),true);
   assert.equal(requests.some(x=>x.path==='/api/hub/artwork/mosaic-compose'),false,
     'TMDB mosaic must only be generated after explicit click');
-  await click('#modalCancel');
+  await ev("document.querySelector('#artGenerateMosaicBtn').disabled=false");
+  await click('#artGenerateMosaicBtn');
+  await wait(() => ev("window.__qaMosaicCalls===1 && document.querySelector('#artPreviewImage')?.hidden===false"), 'generated mosaic preview');
+  const mosaicBefore=await ev("document.querySelector('#artPreviewImage').src");
+  await click('[data-art-mode=preset]');
+  assert.equal(await ev("document.querySelectorAll('.artwork-preset-card').length"),0,
+    'Gradient mode should have no streaming fake logos/presets');
+  assert.equal(await ev("!!document.querySelector('#artColorSecondary')"),true);
+  await click('[data-art-mode=original-mosaic]');
+  assert.equal(await ev("document.querySelector('#artPreviewImage').src"),mosaicBefore,
+    'Switching tabs must retain the generated mosaic');
+  await ev("(()=>{const el=document.querySelector('#artTitleInput');el.value='Descobrir e Assistir';el.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  await wait(() => ev(`document.querySelector('#artPreviewImage')?.src !== ${JSON.stringify(mosaicBefore)}`), 'edited title visible');
+  assert.equal(await ev("window.__qaMosaicCalls"),1,
+    'Typography must never regenerate the original TMDB mosaic');
+  await click('[data-art-mode=ai]');
+  await click('[data-art-mode=original-mosaic]');
+  assert.equal(await ev("document.querySelector('#artPreviewImage').hidden"),false,
+    'Generated mosaic must survive comparisons with AI mode');
+  assert.equal(await ev("window.__qaMosaicCalls"),1);
+  // Save applies the adjusted title to the cached background, without a new TMDB call.
+  await click('#modalSubmit');
+  await wait(() => ev("document.querySelector('#modal').hidden"), 'saved artwork studio');
+  assert.equal(await ev("window.__qaMosaicCalls"),1,'Saving must never generate TMDB again');
+  assert.equal(await ev("!!document.querySelector('.art-preview img[src*=\"/api/hub/artwork/studio/\"]')"),true,
+    'Composed cover should be applied to collection');
+  await ev("window.fetch=window.__qaOriginalFetch;delete window.__qaOriginalFetch;delete window.__qaMosaicCalls");
   await wait(() => ev("document.querySelector('#modal').hidden"), 'close Artwork Studio');
 
   await click('[data-view=settings]');
