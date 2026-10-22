@@ -103,6 +103,12 @@ try {
   await wait(() => ev("document.querySelector('.nuvio-preview-rails-container') !== null"), 'TV home');
   assert.equal(await ev("document.body.textContent.includes('The Last of Us')"), false, 'No unrelated demo titles');
   assert.equal(await ev("document.querySelectorAll('.nuvio-preview-rail-block').length"), 1);
+  for (const mode of ['classic','grid','modern']) {
+    await click(`[data-pv-action=layout][data-value=${mode}]`);
+    await wait(() => ev(`document.querySelector('.nuvio-preview-device')?.classList.contains('layout-${mode}')`), 'mode '+mode);
+    assert.equal(await ev("document.querySelectorAll('.nuvio-preview-rail-block').length"),1);
+  }
+
   await click('[data-pv-action=folder]');
   await wait(() => ev("document.querySelectorAll('.nuvio-preview-title').length===12"), 'first poster page');
   assert.equal(await ev("document.querySelector('.nuvio-preview-title strong')?.textContent"), 'QA Filme 01');
@@ -125,6 +131,11 @@ try {
   assert.ok(requests.length >= 1, 'Preview should load title samples');
   assert.deepEqual(requests.filter(x => x.path !== '/api/hub/preview/catalog-items'), [], 'No writes to workspace');
   assert.deepEqual(errors, [], 'Browser JS exceptions');
+  await click('[data-view=settings]');
+  await wait(() => ev("document.querySelector('#catalogAutoRefresh') !== null"), 'refresh settings');
+  assert.equal(await ev("document.querySelector('#catalogAutoRefresh').checked"),false,'Refresh opt-in default');
+  assert.equal(await ev("document.querySelector('[data-action=catalog-refresh-preview]') !== null"),true);
+
   console.log(JSON.stringify({success: true, home: 1, loadedPages: 2, itemsPerPage: 12,
     mobile, apiRequests: requests.length, writesToLibrary: 0, javascriptErrors: 0}));
 } finally {

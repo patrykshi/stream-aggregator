@@ -106,3 +106,12 @@ Os dados e credenciais locais **nunca devem ser incluídos em commits**. Execute
 - Teste TV com fixture isolada: `npm run qa:tv` (não utiliza `data/` real).
 - Chaves de APIs (TMDB, Trakt, MDBList e Gemini): inserir apenas no `.env` local ou no gerenciador privado de segredos; nunca no GitHub. Sem `GEMINI_API_KEY`, o estúdio utiliza composição visual local. A API Gemini pode gerar custos.
 - Não é possível certificar equivalência pixel a pixel com todas as versões de Nuvio sem registros e testes de referência nessas versões.
+
+## TV Studio e revisão de listas
+
+- Na prévia do Nuvio, alterne **Moderno**, **Clássico** ou **Grade**, e **TV/Celular**. São modelos visuais da organização — a interface exata depende da versão do aplicativo real. Nenhum modo modifica a biblioteca persistida.
+- Em **Configurações → Atualização de listas externas**, confira o resumo de diferenças de Trakt, TMDB, MDBList e TVmaze antes de aplicar. O servidor impede listas vazias, duplicações e reduções superiores a 25%.
+- A atualização automática **é opcional e vem desligada**. Quando ativada, roda diariamente em lotes de até 10 listas, em rotação. A aplicação só consulta APIs externas para atualizar metadados; não autentica nem altera a conta Nuvio.
+- O processo grava backups/revisões do Studio, verifica conflitos, preserva vínculos e mantém os endpoints JSON atualizados. O import na conta Nuvio continua manual, pelos fluxos oficiais da conta.
+
+A verificação `npm run build` analisa a sintaxe JavaScript de frontend, backend, scripts e testes, incluindo os módulos de TV.

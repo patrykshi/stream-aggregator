@@ -1,5 +1,5 @@
 /* Nuvio Hub — Prévia da tela inicial do Nuvio (TV & Celular).
- * Reproduz fielmente o comportamento do Nuvio: Home com Hero Carousel + trilhos de coleções,
+ * Simula, sem alegar equivalência pixel a pixel, a navegação do Nuvio: Home com Hero Carousel + trilhos de coleções,
  * e abertura direta de pastas com abas de fontes e grade de 6 colunas com skeletons. */
 (() => {
   'use strict';
@@ -16,6 +16,7 @@
     sourceIndex: 0,
     page: 0,
     device: 'tv',
+    layout: 'modern',
     analyze: false,
     searchOpen: false,
     art: 'published',
@@ -260,6 +261,8 @@
     ui.search = '';
     ui.searchOpen = false;
     ui.heroIndex = 0;
+    try { ui.layout = globalThis.NuvioPreviewLayout.normalized(localStorage.getItem('nuvio-preview-layout')); }
+    catch { ui.layout = 'modern'; }
     abort();
     ui.cache.clear();
     hydrateHeroSlidesFromWorkspace();
@@ -779,6 +782,9 @@
       '<small>Confira como suas coleções, capas e abas serão exibidas</small>' +
       '</div>' +
       '<div class="nuvio-preview-modal-actions">' +
+      '<div class="nuvio-preview-layout-switch" role="group" aria-label="Visualização da coleção">' +
+      globalThis.NuvioPreviewLayout.buttons(ui.layout, esc) +
+      '</div>' +
       '<div class="nuvio-preview-device-switch" role="group" aria-label="Modo de tela">' +
       '<button type="button" data-pv-action="device" data-value="tv" class="' +
       (ui.device === 'tv' ? 'active' : '') +
@@ -805,7 +811,8 @@
       '<div class="nuvio-preview-layout ' +
       (ui.analyze ? 'with-inspector' : '') +
       '">' +
-      '<div class="nuvio-preview-device ' +
+      '<div class="nuvio-preview-device layout-' +
+      esc(ui.layout) + ' ' +
       esc(ui.device) +
       '">' +
       '<div class="nuvio-preview-screen" tabindex="-1" aria-label="Tela simulada do aplicativo Nuvio">' +
@@ -894,6 +901,10 @@
         return back();
       case 'device':
         ui.device = target.dataset.value === 'mobile' ? 'mobile' : 'tv';
+        return draw({ focus: true });
+      case 'layout':
+        ui.layout = globalThis.NuvioPreviewLayout.normalized(target.dataset.value);
+        try { localStorage.setItem('nuvio-preview-layout', ui.layout); } catch {}
         return draw({ focus: true });
       case 'analyze':
         ui.analyze = !ui.analyze;

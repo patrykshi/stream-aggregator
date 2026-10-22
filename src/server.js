@@ -11,6 +11,7 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import {refreshSettings,saveRefreshSettings,previewCatalogRefresh,commitCatalogRefresh,startCatalogRefreshScheduler,refreshableCatalogs} from './aggregator/catalog-refresh.js';
 import { isPublicReadRoute } from './config/public-read-routes.js';
 import { encodeConfig, decodeConfig, getDefaultConfig } from './config/codec.js';
 import { listProfiles, getProfile, getProfileConfig, saveProfile, deleteProfile } from './config/profiles.js';
@@ -616,6 +617,27 @@ app.post('/api/hub/lists/preview',requireLocalEdit,async(req,res)=>{
   }catch(error){res.status(error.status||400).json({error:error.message,
    ...(error.suggestedType?{suggestedType:error.suggestedType}:{} )});}
 });
+// Revisões de listas externas são isoladas, opcionais e não alteram a conta Nuvio.
+app.get('/api/hub/catalog-refresh/settings',requireLocalEdit,(_req,res)=>{
+ res.setHeader('Cache-Control','no-store');
+ res.json({...refreshSettings(),eligible:refreshableCatalogs(loadStudioImport()).length});
+});
+app.post('/api/hub/catalog-refresh/settings',requireLocalEdit,(req,res)=>{
+ try{res.json(saveRefreshSettings(req.body?.automatic));}
+ catch(e){res.status(400).json({error:e.message});}
+});
+app.post('/api/hub/catalog-refresh/preview',requireLocalEdit,async(_req,res)=>{
+ try{res.setHeader('Cache-Control','no-store');res.json(await previewCatalogRefresh());}
+ catch(e){res.status(e.status||400).json({error:e.message});}
+});
+app.post('/api/hub/catalog-refresh/apply',requireLocalEdit,(req,res)=>{
+ try{
+  const outcome=commitCatalogRefresh(req.body?.token,req.body?.expectedRevision);
+  invalidateBridgeCache();invalidatePublication();res.json(outcome);
+ }catch(e){res.status(e.status||400).json({error:e.message});}
+});
+startCatalogRefreshScheduler(()=>{invalidateBridgeCache();invalidatePublication();});
+
 app.post('/api/hub/catalogs/reorder',requireLocalEdit,(req,res)=>{
   try{
     const current=loadStudioImport();
