@@ -2656,8 +2656,18 @@ async function openArtworkStudio(targetKind='folder'){
  const initialTitle=String(targetObj?.title||'').trim();
  const initialSub=isGroup?((g.folders?.length||0)+' PASTAS'):(g.title||'');
 
- let presetsData={shapes:{},presets:[]};
- try{presetsData=await request('/api/hub/artwork/studio-presets');}catch{}
+ let presetsData={shapes:{},presets:[]},mosaicData={groups:{},configured:false};
+ try{
+   [presetsData,mosaicData]=await Promise.all([
+    request('/api/hub/artwork/studio-presets'),
+    request('/api/hub/artwork/mosaic-categories')
+   ]);
+ }catch{}
+ const mosaicGroupLabels={generos:'Gêneros',temas:'Temas',streaming:'Streaming',
+  estudios:'Estúdios',decadas:'Décadas',mundo:'Países e regiões'};
+ const initialMosaicGroup='generos';
+ const initialMosaicCategory=mosaicData.groups?.generos?.find(c=>initialTitle.toLowerCase().includes(c.name.toLowerCase()))?.name||
+   mosaicData.groups?.generos?.[0]?.name||'';
  const presets=presetsData.presets||[];
 
  const studioState={
@@ -2667,9 +2677,11 @@ async function openArtworkStudio(targetKind='folder'){
   markMode:'none',
   uploadedMark:'',
   aiImageDataUrl:'',
-  pythonColor:'#d4ab54',
-  pythonFontSize:95,
-  pythonDivider:true,
+  mosaicGroup:initialMosaicGroup,
+  mosaicCategory:initialMosaicCategory,
+  mosaicCards:16,
+  mosaicImageDataUrl:'',
+  mosaicBusy:false,
   shape:initialShape,
   tileShape:initialTileShape,
   ratio:TILE_SHAPE_TO_RATIO[initialTileShape]||'16:9',
@@ -2730,10 +2742,10 @@ async function openArtworkStudio(targetKind='folder'){
   `<div class="artwork-studio-modal">
    <div class="artwork-studio-top-bar">
     <div class="artwork-studio-modes" role="tablist" aria-label="Modo de criação">
-     <button type="button" class="artwork-mode-tab active" data-art-mode="mosaic">1. Mosaico & Arte TMDB</button>
+     <button type="button" class="artwork-mode-tab active" data-art-mode="mosaic">1. Colagem de títulos (2–4 imagens)</button>
      <button type="button" class="artwork-mode-tab" data-art-mode="preset">2. Temas e cores (sem logo falso)</button>
      <button type="button" class="artwork-mode-tab" data-art-mode="ai">3. IA Gemini</button>
-     <button type="button" class="artwork-mode-tab" data-art-mode="python">4. Criador Python do PC</button>
+     <button type="button" class="artwork-mode-tab" data-art-mode="original-mosaic">4. Mosaicos originais TMDB</button>
     </div>
     <div class="artwork-studio-shape-bar" role="group" aria-label="Proporção e tamanho da capa">
      ${shapeOptions.map(opt=>`<button type="button" class="artwork-shape-pill ${studioState.shape===opt.shape?'active':''}" data-art-shape="${opt.shape}" data-tile-shape="${opt.tileShape}" data-art-ratio="${opt.ratio}" aria-pressed="${studioState.shape===opt.shape}">${esc(opt.label)}</button>`).join('')}
@@ -2811,14 +2823,24 @@ async function openArtworkStudio(targetKind='folder'){
       <p class="muted" style="margin-top:8px">IA real via Gemini · ${presetsData.ai?.configured?'Chave conectada. A geração utiliza sua API e pode ter custo.':'Não configurada. Acesse Configurações → Integrações → Gemini e salve sua chave.'} A geração só ocorre ao clicar em Gerar, nunca automaticamente.</p>
      </div>
 
-     <div id="artPanePython" class="artwork-pane" hidden>
-      <p class="muted">Utiliza o renderizador Pillow encontrado em <code>Projetos/Midia/TMDB/tmdb-capas/render.py</code>, montado em modo leitura. O layout original de capa dourada é preservado.</p>
+     <div id="artPaneOriginalMosaic" class="artwork-pane" hidden>
+      <p class="panel-sub">Use o <strong>gerador de mosaicos diagonal do seu PC</strong>: várias imagens reais do TMDB em fileiras inclinadas. O algoritmo original é executado sem alterar o projeto Python.</p>
       <div class="artwork-inline-options">
-       <label class="field"><span>Cor da tipografia</span><input type="color" id="artPythonColor" value="#d4ab54"></label>
-       <label class="field"><span>Tamanho do título</span><input type="number" id="artPythonFont" min="24" max="180" value="95"></label>
-       <label class="settings-check"><input id="artPythonDivider" type="checkbox" checked>Divisor dourado</label>
+       <label class="field"><span>Origem</span><select id="artMosaicGroup">
+        ${Object.keys(mosaicData.groups||{}).map(id=>`<option value="${esc(id)}" ${id===studioState.mosaicGroup?'selected':''}>${esc(mosaicGroupLabels[id]||id)}</option>`).join('')}
+       </select></label>
+       <label class="field"><span>Categoria</span><select id="artMosaicCategory">
+        ${(mosaicData.groups?.[studioState.mosaicGroup]||[]).map(item=>`<option value="${esc(item.name)}" ${item.name===studioState.mosaicCategory?'selected':''}>${esc(item.name)}</option>`).join('')}
+       </select></label>
+       <label class="field"><span>Imagens no mosaico</span><select id="artMosaicCards">
+         ${[12,16,20,28].map(n=>`<option value="${n}" ${studioState.mosaicCards===n?'selected':''}>${n} imagens</option>`).join('')}
+       </select></label>
       </div>
-      <p class="muted">${presetsData.python?.configured?'Motor Python conectado.':'Motor Python indisponível neste ambiente.'} Usa a primeira imagem escolhida no TMDB como fundo. Não insere ícones de outras fontes.</p>
+      <div class="settings-actions"><button type="button" id="artGenerateMosaicBtn" class="btn btn-primary" ${!mosaicData.configured?'disabled':''}>Gerar mosaico com TMDB</button></div>
+      <p class="muted">${mosaicData.configured
+        ?mosaicData.tmdbConfigured?'TMDB conectado. Clique para criar o mosaico real (a consulta pode demorar).':'Cadastre sua chave TMDB em Configurações → Integrações.'
+        :'Criador original indisponível no PC. Confira o diretório tmdb-mosaicos.'}
+        A geração só começa ao clicar no botão; salvar a prévia não consulta o TMDB novamente.</p>
      </div>
 
      <div class="artwork-typography-box">
@@ -2872,17 +2894,15 @@ async function openArtworkStudio(targetKind='folder'){
    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-neutral','Salvando capa localmente no Hub...');
    let finalSaved=studioState.savedResult;
    if(!finalSaved){
-    if(studioState.mode==='ai'){
-     if(!studioState.aiImageDataUrl)throw Error('Clique em Gerar com IA para criar a arte real antes de salvar.');
+    if(studioState.mode==='ai'||studioState.mode==='original-mosaic'){
+     const generated=studioState.mode==='ai'?studioState.aiImageDataUrl:studioState.mosaicImageDataUrl;
+     if(!generated)throw Error('Clique em Gerar para criar a imagem antes de salvar.');
      finalSaved=await request('/api/hub/artwork/save',{method:'POST',
-       body:JSON.stringify({dataUrl:studioState.aiImageDataUrl,shape:studioState.shape,
-         title:studioState.title,mode:'ai-gemini'})});
+       body:JSON.stringify({dataUrl:generated,shape:studioState.shape,
+         title:studioState.title,mode:studioState.mode==='ai'?'ai-gemini':'tmdb-original-python'})});
     }else{
-     const endpoint=studioState.mode==='python'?'/api/hub/artwork/python-compose':'/api/hub/artwork/compose';
-     finalSaved=await request(endpoint,{method:'POST',body:JSON.stringify({
-       ...commonArtworkPayload(),
-       titleColor:studioState.pythonColor,fontSize:studioState.pythonFontSize,
-       showDivider:studioState.pythonDivider,save:true
+     finalSaved=await request('/api/hub/artwork/compose',{method:'POST',body:JSON.stringify({
+       ...commonArtworkPayload(),save:true
      })});
     }
    }
@@ -2930,17 +2950,26 @@ async function openArtworkStudio(targetKind='folder'){
   if(summary)summary.textContent=labelMap[studioState.shape]||studioState.shape;
  };
 
- const refreshComposePreview=async({isAi=false}={})=>{
-  if(isAi&&studioState.aiBusy)return;
+ const refreshComposePreview=async({isAi=false,isMosaic=false}={})=>{
+  if((isAi&&studioState.aiBusy)||(isMosaic&&studioState.mosaicBusy))return;
   const serial=++studioState.previewSerial;
   if(isAi)studioState.aiBusy=true;
-  const generateBtn=$('artGenerateAiBtn');
+  if(isMosaic)studioState.mosaicBusy=true;
+  const generateBtn=$('artGenerateAiBtn'),mosaicButton=$('artGenerateMosaicBtn');
   if(generateBtn)generateBtn.disabled=studioState.aiBusy;
+  if(mosaicButton)mosaicButton.disabled=studioState.mosaicBusy;
   studioState.savedResult=null;
   updateShapeStageClass();
   const imgEl=$('artPreviewImage');
   const placeholder=$('artPreviewPlaceholder');
   const statusEl=$('artStudioStatus');
+  if(studioState.mode==='original-mosaic'&&!isMosaic){
+    studioState.mosaicImageDataUrl='';
+    if(imgEl){imgEl.hidden=true;imgEl.removeAttribute('src');}
+    if(placeholder){placeholder.hidden=false;placeholder.textContent='Escolha um gênero, tema ou streaming e clique em Gerar mosaico com TMDB.';}
+    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-neutral','O original cria fileiras diagonais com 12 a 28 backdrops do TMDB.');
+    return;
+  }
   if(studioState.mode==='ai'&&!isAi){
     studioState.aiImageDataUrl='';
     if(imgEl){imgEl.hidden=true;imgEl.removeAttribute('src');}
@@ -2950,19 +2979,21 @@ async function openArtworkStudio(targetKind='folder'){
     if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-neutral','A geração por IA só ocorre mediante clique explícito.');
     return;
   }
-  if(placeholder){placeholder.hidden=false;placeholder.textContent=isAi?'Solicitando imagem real ao Gemini...':'Compondo prévia...';}
-  const endpoint=isAi?'/api/hub/artwork/generate-ai':
-    studioState.mode==='python'?'/api/hub/artwork/python-compose':'/api/hub/artwork/compose';
+  if(placeholder){placeholder.hidden=false;placeholder.textContent=isMosaic?'Consultando backdrops do TMDB e montando fileiras diagonais...':
+    isAi?'Solicitando imagem real ao Gemini...':'Compondo prévia...';}
+  const endpoint=isMosaic?'/api/hub/artwork/mosaic-compose':
+    isAi?'/api/hub/artwork/generate-ai':'/api/hub/artwork/compose';
   try{
    const res=await request(endpoint,{method:'POST',body:JSON.stringify({
      ...commonArtworkPayload(),prompt:studioState.aiPrompt,style:studioState.aiStyle,
-     titleColor:studioState.pythonColor,fontSize:studioState.pythonFontSize,
-     showDivider:studioState.pythonDivider,save:false
+     group:studioState.mosaicGroup,category:studioState.mosaicCategory,
+     cards:studioState.mosaicCards,save:false
    })});
    if(serial!==studioState.previewSerial)return;
    if(res?.dataUrl&&imgEl){
     imgEl.src=res.dataUrl;imgEl.hidden=false;
     if(isAi)studioState.aiImageDataUrl=res.dataUrl;
+    if(isMosaic)studioState.mosaicImageDataUrl=res.dataUrl;
     if(placeholder)placeholder.hidden=true;
     if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-valid',
       `Prévia ${res.provider||'local'} pronta em ${res.width}×${res.height}px. Salve e aplique para vincular.`);
@@ -2974,7 +3005,9 @@ async function openArtworkStudio(targetKind='folder'){
    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-error',err.message||'Falha ao compor prévia.');
   }finally{
    if(isAi)studioState.aiBusy=false;
+   if(isMosaic)studioState.mosaicBusy=false;
    if(generateBtn)generateBtn.disabled=studioState.aiBusy;
+   if(mosaicButton)mosaicButton.disabled=studioState.mosaicBusy;
   }
  };
 
@@ -3056,7 +3089,7 @@ async function openArtworkStudio(targetKind='folder'){
    $('artPaneMosaic').hidden=studioState.mode!=='mosaic';
    $('artPanePreset').hidden=studioState.mode!=='preset';
    $('artPaneAi').hidden=studioState.mode!=='ai';
-   $('artPanePython').hidden=studioState.mode!=='python';
+   $('artPaneOriginalMosaic').hidden=studioState.mode!=='original-mosaic';
    void refreshComposePreview();
    return;
   }
@@ -3128,6 +3161,9 @@ async function openArtworkStudio(targetKind='folder'){
    void loadTmdbCandidates($('artTmdbSearch')?.value||'');
    return;
   }
+  if(e.target.id==='artGenerateMosaicBtn'){
+   void refreshComposePreview({isMosaic:true});return;
+  }
   if(e.target.id==='artGenerateAiBtn'){
    studioState.aiPrompt=$('artAiPrompt')?.value||studioState.aiPrompt;
    studioState.aiStyle=$('artAiStyle')?.value||studioState.aiStyle;
@@ -3158,12 +3194,17 @@ async function openArtworkStudio(targetKind='folder'){
    const reader=new FileReader();reader.onload=()=>{
      studioState.uploadedMark=String(reader.result||'');void refreshComposePreview();
    };reader.readAsDataURL(file);
-  }else if(id==='artPythonColor'){
-   studioState.pythonColor=e.target.value;void refreshComposePreview();
-  }else if(id==='artPythonFont'){
-   studioState.pythonFontSize=Number(e.target.value)||95;void refreshComposePreview();
-  }else if(id==='artPythonDivider'){
-   studioState.pythonDivider=e.target.checked;void refreshComposePreview();
+  }else if(id==='artMosaicGroup'){
+   studioState.mosaicGroup=e.target.value;
+   studioState.mosaicCategory=mosaicData.groups?.[studioState.mosaicGroup]?.[0]?.name||'';
+   const target=$('artMosaicCategory');
+   if(target)target.innerHTML=(mosaicData.groups?.[studioState.mosaicGroup]||[]).map(c=>
+     `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+   void refreshComposePreview();
+  }else if(id==='artMosaicCategory'){
+   studioState.mosaicCategory=e.target.value;void refreshComposePreview();
+  }else if(id==='artMosaicCards'){
+   studioState.mosaicCards=Number(e.target.value)||16;void refreshComposePreview();
   }
   else if(id==='artAiStyle'){studioState.aiStyle=e.target.value;void refreshComposePreview();}
   else if(id==='artHideTitleCheck'){studioState.hideTitle=e.target.checked;void refreshComposePreview();}

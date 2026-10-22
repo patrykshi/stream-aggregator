@@ -24,16 +24,15 @@ services:
       - NODE_ENV=production
       - BIND_HOST=0.0.0.0
       - PUBLIC_PORT=7002
-      - PYTHON_COVER_ENABLED=1
-      - PYTHON_COVER_SOURCE=/app/python-legacy
+      - PYTHON_MOSAIC_ENABLED=1
+      - PYTHON_MOSAIC_SOURCE=/app/python-mosaic-source
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - TMDB_API_KEY=${TMDB_API_KEY:-}
       - TRAKT_CLIENT_ID=${TRAKT_CLIENT_ID:-}
       - MDBLIST_API_KEY=${MDBLIST_API_KEY:-}
     volumes:
       - ./data:/app/data
-      - ${PYTHON_COVER_PATH:-/home/patryk-rocha/Projetos/Midia/TMDB/tmdb-capas}/render.py:/app/python-legacy/render.py:ro
-      - ${PYTHON_COVER_PATH:-/home/patryk-rocha/Projetos/Midia/TMDB/tmdb-capas}/assets:/app/python-legacy/assets:ro
+      - ${PYTHON_MOSAIC_PATH:-/home/patryk-rocha/Projetos/Midia/TMDB/tmdb-mosaicos}/gerar_mosaicos.py:/app/python-mosaic-source/gerar_mosaicos.py:ro
     logging:
       driver: "json-file"
       options:
