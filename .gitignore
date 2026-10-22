@@ -59,3 +59,6 @@ data/backup-*/
 
 # Relatórios locais de segurança
 /.github-secrets-audit/
+
+# Gravações de tela podem conter informações privadas; manter fora do repositório.
+/public/assets/aistudio/*.mp4

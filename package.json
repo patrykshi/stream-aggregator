@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "build": "node --check src/server.js",
+    "qa:tv": "node scripts/qa-nuvio-tv-preview.mjs",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {

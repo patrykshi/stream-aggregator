@@ -49,15 +49,38 @@ describe('Amostra segura de catálogo no Preview do Nuvio',()=>{
   assert.match(received,/example.com\/catalog\/movie\/movies-trending.json/);
   assert.equal(opts.redirect,'error');
  });
- it('envia genre=None quando o manifesto do catálogo exige esse parâmetro',async()=>{
-  let requested='';
+ it('envia genre=None e avança de 12 em 12 sem pular 88 títulos do lote remoto',async()=>{
+  const requested=[];
+  const metas=Array.from({length:120},(_,i)=>({id:'tt'+String(2000000+i),name:'Título '+i}));
   const required={...provider,catalog:{...provider.catalog,
    extra:[{name:'genre',isRequired:true,options:['None','Drama']},{name:'skip',isRequired:false}]}};
-  await fetchPreviewSample({selection:{...source,page:1},provider:required,fetchImpl:async(url)=>{
-   requested=url;return reply([{id:'tt1234567',name:'Teste'}]);
-  }});
-  assert.ok(requested.includes('genre=None'));
-  assert.ok(requested.includes('skip=100'));
+  const fetchImpl=async url=>{
+   requested.push(url);
+   const skip=Number(new URL(url).pathname.match(/skip=(\d+)/)?.[1]||0);
+   return reply(metas.slice(skip,skip+100));
+  };
+  const second=await fetchPreviewSample({selection:{...source,page:1},provider:required,fetchImpl});
+  assert.equal(second.items[0].id,metas[12].id);
+  assert.equal(second.count,12);
+  assert.ok(requested.every(url=>url.includes('genre=None')));
+  const boundary=await fetchPreviewSample({selection:{...source,page:8},provider:required,fetchImpl});
+  assert.equal(boundary.items[0].id,metas[96].id);
+  assert.equal(boundary.items.at(-1).id,metas[107].id);
+  const next=await fetchPreviewSample({selection:{...source,page:9},provider:required,fetchImpl});
+  assert.equal(next.items[0].id,metas[108].id);
+  assert.ok(requested.some(url=>url.includes('skip=100')));
+ });
+ it('avança sem lacunas nas páginas de 20 itens fornecidas pelo addon',async()=>{
+   const data=Array.from({length:55},(_,i)=>({id:'tt'+String(3000000+i),name:'Item '+i}));
+   const fetchImpl=async url=>{
+     const skip=Number(new URL(url).pathname.match(/skip=(\d+)/)?.[1]||0);
+     return reply(data.slice(skip,skip+20));
+   };
+   for(let page=0;page<5;page++){
+     const result=await fetchPreviewSample({selection:{...source,page},provider,fetchImpl});
+     assert.equal(result.items[0]?.id,data[page*12]?.id);
+     assert.deepEqual(result.items.map(x=>x.id),data.slice(page*12,page*12+12).map(x=>x.id));
+   }
  });
   it('preserva somente imagens HTTPS e mostra capa ausente de forma explícita',()=>{
   const result=normalizePreviewItems([{id:'abc',poster:'javascript:alert(1)',name:'x'},
@@ -86,7 +109,7 @@ describe('Amostra segura de catálogo no Preview do Nuvio',()=>{
    provider,fetchImpl:async(u)=>{url=u;return reply([]);}});
   assert.ok(url.startsWith('https://example.com/catalog/'));
   assert.ok(url.includes('genre'));
-  assert.ok(url.includes('skip=100'), 'o preview usa janelas Stremio de 100 em vez de skip=12');
+  assert.ok(!url.includes('skip=100'), 'não pode pular os primeiros 100 títulos');
   assert.ok(!url.includes('evil'));
  });
  it('mantém apenas o botão "Prévia no Nuvio" na aba Coleções e abre pasta direto nas abas com grade e skeletons',async()=>{

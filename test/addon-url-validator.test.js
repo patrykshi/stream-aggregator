@@ -229,39 +229,19 @@ describe('Validador unificado de URL de addon (public/app.js)', () => {
     assert.match(colRes.message, /Coleções → Importar JSON/);
   });
 
-  it('permite POST local e proxy de preview em isLocalEditorRequest, bloqueando Cloudflare Tunnel e origens externas', () => {
-    // Loopback direto
-    assert.equal(isLocalEditorRequest({
-      headers: { host: '127.0.0.1:7001', origin: 'http://127.0.0.1:7001' }
-    }, 7001), true);
-
-    // Proxy local de preview (Nginx -> localhost:3000 com X-Forwarded-Host autenticado)
-    assert.equal(isLocalEditorRequest({
-      headers: {
-        host: 'localhost:3000',
-        origin: 'https://ais-dev-yvvc33zdqgn56vifkpdpjq-487571618487.us-east1.run.app',
-        'x-forwarded-host': 'ais-dev-yvvc33zdqgn56vifkpdpjq-487571618487.us-east1.run.app'
-      }
-    }, 3000), true);
-
-    // Bloqueia se vier pelo Cloudflare Tunnel (cf-connecting-ip presente)
-    assert.equal(isLocalEditorRequest({
-      headers: {
-        host: 'localhost:3000',
-        'cf-connecting-ip': '203.0.113.10',
-        origin: 'https://ais-dev-yvvc33zdqgn56vifkpdpjq-487571618487.us-east1.run.app',
-        'x-forwarded-host': 'ais-dev-yvvc33zdqgn56vifkpdpjq-487571618487.us-east1.run.app'
-      }
-    }, 3000), false);
-
-    // Bloqueia origem externa não correspondente (CSRF protection)
-    assert.equal(isLocalEditorRequest({
-      headers: {
-        host: 'localhost:3000',
-        origin: 'https://evil.example.com',
-        'x-forwarded-host': 'ais-dev-yvvc33zdqgn56vifkpdpjq-487571618487.us-east1.run.app'
-      }
-    }, 3000), false);
+  it('permite edição local e rejeita proxies, túneis, host falsificado e requisições cross-site', () => {
+    const local = { headers: { host: '127.0.0.1:7001', origin: 'http://127.0.0.1:7001', 'sec-fetch-site': 'same-origin' } };
+    assert.equal(isLocalEditorRequest(local, 7001), true);
+    assert.equal(isLocalEditorRequest({headers:{host:'[::1]:7001'}},7001), true);
+    assert.equal(isLocalEditorRequest({headers:{host:'localhost:7001'}},7001), true);
+    assert.equal(isLocalEditorRequest({headers:{...local.headers, 'cf-connecting-ip':'203.0.113.8'}},7001), false);
+    assert.equal(isLocalEditorRequest({headers:{...local.headers, 'x-forwarded-host':'127.0.0.1:7001'}},7001), false);
+    assert.equal(isLocalEditorRequest({headers:{...local.headers, 'x-forwarded-for':'203.0.113.8'}},7001), false);
+    assert.equal(isLocalEditorRequest({headers:{...local.headers, origin:'https://example.org'}},7001), false);
+    assert.equal(isLocalEditorRequest({headers:{...local.headers, 'sec-fetch-site':'cross-site'}},7001), false);
+    assert.equal(isLocalEditorRequest({headers:{host:'127.0.0.1:7070'}},7001), false);
+    assert.equal(isLocalEditorRequest({headers:{host:'stream.patrykrocha.com'}},7001), false);
+    assert.equal(isLocalEditorRequest({headers:{host:'127.0.0.1:7001',origin:'null'}},7001), false);
   });
 
   it('validateAddonManifestOnServer rotaciona User-Agent quando recebe HTTP 403 e envia cabeçalho Authorization', async () => {

@@ -230,6 +230,12 @@ export function getMonitorReport(config) {
       configuredTimeoutMs: Number.isInteger(addon.requestTimeoutMs)
         ? Math.min(Math.max(addon.requestTimeoutMs,3000),30000) : 7500,
       health: h ? { ...h.last, checks: h.checks, failures: h.failures, consecutiveFailures: h.consecutiveFailures } : null,
+      diagnostics: {
+        manifest: h?.last?.status || 'unchecked',
+        streamSearch: s?.last?.status || 'unchecked',
+        // Uma lista de streams não comprova que os links reproduzem na TV.
+        playback: 'unverified'
+      },
       search: s ? {
         ...s.last,
         ...latencyStats(s.samples),

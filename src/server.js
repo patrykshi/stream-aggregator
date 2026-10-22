@@ -11,6 +11,7 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import { isPublicReadRoute } from './config/public-read-routes.js';
 import { encodeConfig, decodeConfig, getDefaultConfig } from './config/codec.js';
 import { listProfiles, getProfile, getProfileConfig, saveProfile, deleteProfile } from './config/profiles.js';
 import { aggregateStreams, normalizeAddonBaseUrl } from './aggregator/engine.js';
@@ -1097,7 +1098,31 @@ app.get('*', (req, res, next) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Stream Aggregator rodando em http://localhost:${PORT}`);
+// Fora do Docker o painel de edição só escuta no próprio computador.
+// Dentro do container a porta publicada pelo Compose é restrita a 127.0.0.1.
+const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
+app.listen(PORT, BIND_HOST, () => {
+  console.log(`Stream Aggregator ouvindo em ${BIND_HOST}:${PORT}`);
 });
+
+// Ingress exclusivo para o túnel: recusa rotas administrativas antes mesmo de
+// executar o Express principal, independente de cabeçalhos Host/Cloudflare.
+// Não habilitado no npm start local; Docker Compose ativa PUBLIC_PORT=7002.
+if (process.env.PUBLIC_PORT) {
+  const publicPort = Number(process.env.PUBLIC_PORT);
+  if (!Number.isInteger(publicPort) || publicPort < 1 || publicPort > 65535 || publicPort === Number(PORT)) {
+    throw Error('PUBLIC_PORT precisa ser uma porta distinta da porta administrativa.');
+  }
+  const publicApp = express();
+  publicApp.use((req, res, next) => {
+    if (!isPublicReadRoute(req.method, req.path)) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(404).json({ error: 'Endpoint não disponível no acesso público.' });
+    }
+    app(req, res, next);
+  });
+  publicApp.listen(publicPort, BIND_HOST, () => {
+    console.log(`Nuvio ingress de leitura ouvindo em ${BIND_HOST}:${publicPort}`);
+  });
+}
 

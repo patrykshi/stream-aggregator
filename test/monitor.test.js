@@ -39,6 +39,9 @@ describe('Monitoramento de provedores', () => {
     recordSearch(b, { status: 'timeout', durationMs: 7500, count: 0 });
     recordAggregate({ type: 'movie', activeProviders: 1, delivered: 2, durationMs: 7500 });
     const status = getMonitorReport({ addons: [a,b] });
+    assert.equal(status.items[0].diagnostics.streamSearch, 'results');
+    assert.equal(status.items[0].diagnostics.playback, 'unverified');
+    assert.equal(status.items[1].diagnostics.streamSearch, 'timeout');
     assert.equal(status.items[0].search.delivered, 2);
     assert.equal(status.items[0].search.averageMs, 230);
     assert.equal(status.items[0].search.idConverted, true);

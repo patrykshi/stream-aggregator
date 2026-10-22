@@ -3,5 +3,5 @@ tunnel: SEU_UUID_DO_TUNNEL
 credentials-file: /etc/cloudflared/credentials.json
 ingress:
   - hostname: hub.seudominio.com
-    service: http://stream-aggregator:7001
+    service: http://stream-aggregator:7002
   - service: http_status:404

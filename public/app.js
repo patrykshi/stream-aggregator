@@ -550,7 +550,7 @@ function renderCollections(){
 function renderMonitor(){
  const report=state.monitor;
  return pageTitle('OPERAÇÃO / MONITOR','Saúde dos addons',
-  'Os testes mostram se os manifestos respondem e o histórico de buscas. Um manifesto online não garante resultados para todo título.',
+  'Manifesto, busca e reprodução são verificações distintas. O Hub não testa automaticamente se um vídeo reproduz no Nuvio.',
   makeBtn('Verificar agora','monitor-check','btn btn-primary',state.editable?'':'disabled')+
   makeBtn('Atualizar','monitor-refresh'))+
  (report?`<div class="stat-grid">
@@ -558,11 +558,12 @@ function renderMonitor(){
  <div class="stat"><div class="value">${(report.items||[]).filter(x=>x.health&&x.health.status!=='online').length}</div><span class="descriptor">Com problemas</span></div>
  <div class="stat"><div class="value">${(report.items||[]).filter(x=>x.enabled).length}</div><span class="descriptor">Ativos</span></div>
  <div class="stat"><div class="value">${report.latestSearch?.durationMs||'—'}</div><span class="descriptor">Última busca (ms)</span></div></div>
- <div class="panel"><div class="table-wrap"><table><thead><tr><th>Addon</th><th>Manifesto</th><th>Tempo</th><th>Última consulta</th></tr></thead>
+ <div class="panel"><div class="table-wrap"><table><thead><tr><th>Addon</th><th>Manifesto</th><th>Tempo</th><th>Busca de streams</th><th>Reprodução</th></tr></thead>
  <tbody>${(report.items||[]).map(a=>`<tr><td><b>${esc(a.name)}</b><small>${esc((a.resources||[]).join(' · '))}</small></td>
  <td><span class="badge ${a.health?.status==='online'?'ok':a.health?'error':'off'}">${esc(a.health?.status||'Aguardando')}</span></td>
  <td>${a.health?.durationMs==null?'—':a.health.durationMs+' ms'}</td>
- <td>${esc(a.search?.status||'Nenhuma busca registrada')}</td></tr>`).join('')}</tbody></table></div></div>`:
+ <td>${esc(a.diagnostics?.streamSearch==='unchecked'?'Não testada':a.diagnostics?.streamSearch||'Não testada')} ${a.search?.delivered>0?'('+a.search.delivered+' streams entregues)':''}</td>
+ <td><span class="badge off">Não verificada na TV</span></td></tr>`).join('')}</tbody></table></div></div>`:
  '<div class="panel"><div class="empty"><b>Monitor ainda não consultado</b><span>Use Atualizar para consultar os dados de desempenho.</span></div></div>');
 }
 function renderPublish(){

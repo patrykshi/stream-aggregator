@@ -133,7 +133,7 @@ export async function fetchCatalog(config, type, namespacedId, extra = '') {
     const res = await fetch(catalogUrl, {
       signal: controller.signal,
       headers: DEFAULT_FETCH_HEADERS,
-      redirect: 'follow'
+      redirect: 'error'
     });
 
     clearTimeout(timeoutId);
@@ -203,7 +203,7 @@ export async function fetchMeta(config, type, id) {
       const res = await fetch(metaUrl, {
         signal: controller.signal,
         headers: DEFAULT_FETCH_HEADERS,
-        redirect: 'follow'
+        redirect: 'error'
       });
       clearTimeout(timeoutId);
 

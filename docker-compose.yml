@@ -17,9 +17,14 @@ services:
     pids_limit: 128
     ports:
       - "127.0.0.1:${PORT:-7001}:7001"
+    expose:
+      - "7002"
     environment:
       - PORT=7001
       - NODE_ENV=production
+      - BIND_HOST=0.0.0.0
+      - PUBLIC_PORT=7002
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - TMDB_API_KEY=${TMDB_API_KEY:-}
       - TRAKT_CLIENT_ID=${TRAKT_CLIENT_ID:-}
       - MDBLIST_API_KEY=${MDBLIST_API_KEY:-}
