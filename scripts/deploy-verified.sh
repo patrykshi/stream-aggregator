@@ -31,7 +31,11 @@ trap rollback ERR
 docker compose up -d --build --no-deps stream-aggregator
 healthy=false
 for i in {1..40}; do
-  if curl -fsS -m 3 http://127.0.0.1:7001/health >/dev/null; then healthy=true; break; fi
+  if curl -fsS -m 3 http://127.0.0.1:7001/health >/dev/null 2>&1; then healthy=true; break; fi
+  if (( i > 5 )) && (( $(docker inspect stream-aggregator --format '{{.RestartCount}}' 2>/dev/null || echo 0) >= 2 )); then
+    echo 'Container reiniciando repetidamente; abortando o deploy sem prolongar a indisponibilidade.' >&2
+    false
+  fi
   sleep 1
 done
 [[ "$healthy" == 'true' ]] || { false; }

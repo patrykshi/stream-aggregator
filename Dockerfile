@@ -11,6 +11,10 @@ RUN npm ci --omit=dev
 COPY src ./src
 COPY public ./public
 
+# Git checkout may happen under umask 077 in deployment scripts.
+# The unprivileged Node user must still be able to read application code.
+RUN chmod -R a+rX /app/src /app/public /app/node_modules
+
 # Define usuário sem privilégios de root para segurança
 USER node
 
