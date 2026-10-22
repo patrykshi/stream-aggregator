@@ -20,3 +20,4 @@ jobs:
       - run: bash -n scripts/deploy-verified.sh scripts/backup-verify.sh
       - run: npm test
       - run: docker build --tag nuvio-hub:ci .
+      - run: docker run --rm --entrypoint sh nuvio-hub:ci -c 'test -r /app/src/server.js && test -r /app/public/index.html && node --check /app/src/server.js'
