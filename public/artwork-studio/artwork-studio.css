@@ -1,0 +1,1189 @@
+/* Nuvio Hub — Artwork Studio 2.0 Stylesheet
+ * Estética cinematográfica Dark Mode, workspace profissional em tela cheia e simulação de TV. */
+
+body.artwork-studio-active {
+  overflow: hidden !important;
+}
+
+.artwork-studio-workspace {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: #060911;
+  color: #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  user-select: none;
+}
+
+.artwork-studio-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ---------------- Topbar ---------------- */
+
+.artwork-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 16px;
+  background-color: #0b111e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.artwork-topbar-left,
+.artwork-topbar-center,
+.artwork-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.artwork-back-btn {
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 6px 12px;
+}
+.artwork-back-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.artwork-project-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.artwork-project-title-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 4px 8px;
+  outline: none;
+  max-width: 200px;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.artwork-project-title-input:hover,
+.artwork-project-title-input:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.artwork-target-badge {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  white-space: nowrap;
+}
+
+.artwork-save-status-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.artwork-save-status-pill.is-dirty {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.artwork-save-status-pill.is-saving,
+.artwork-save-status-pill.is-exporting,
+.artwork-save-status-pill.is-applying {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+}
+
+.artwork-save-status-pill.is-error {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+
+.artwork-shape-group {
+  display: flex;
+  background: #060911;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.artwork-shape-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.artwork-shape-btn:hover {
+  color: #ffffff;
+}
+.artwork-shape-btn.active {
+  background: #1e293b;
+  color: #38bdf8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.artwork-view-switcher {
+  display: flex;
+  background: #060911;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.artwork-view-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.artwork-view-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+/* ---------------- Main Body ---------------- */
+
+.artwork-workspace-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ---------------- Left Tool Rail ---------------- */
+
+.artwork-tool-rail {
+  width: 72px;
+  background-color: #0b111e;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 4px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.artwork-tool-tab {
+  width: 60px;
+  height: 56px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.artwork-tool-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+}
+.artwork-tool-tab.active {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+}
+
+.tool-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+.tool-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ---------------- Left Tool Drawer ---------------- */
+
+.artwork-tool-drawer {
+  width: 320px;
+  background-color: #0e1626;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width 0.2s ease, opacity 0.2s ease;
+  overflow: hidden;
+  z-index: 9;
+}
+.artwork-tool-drawer.collapsed {
+  width: 0;
+  opacity: 0;
+  border-right: none;
+}
+
+.artwork-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.artwork-drawer-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.artwork-drawer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drawer-desc {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.tool-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tool-section h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #cbd5e1;
+}
+
+/* ---------------- Center Viewport ---------------- */
+
+.artwork-center-viewport {
+  flex: 1;
+  background-color: #060911;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.artwork-canvas-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 24px;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.artwork-canvas-wrap {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.artwork-viewport-footer {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(14, 22, 38, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 5;
+}
+
+.artwork-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.artwork-zoom-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cbd5e1;
+  min-width: 44px;
+  text-align: center;
+}
+
+/* ---------------- Right Sidebar ---------------- */
+
+.artwork-right-sidebar {
+  width: 290px;
+  background-color: #0b111e;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.artwork-tab-header {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  height: 44px;
+}
+
+.artwork-sidebar-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.artwork-sidebar-tab:hover {
+  color: #ffffff;
+}
+.artwork-sidebar-tab.active {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.04);
+}
+
+.artwork-sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.prop-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.prop-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.artwork-btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---------------- Layers List ---------------- */
+
+.artwork-layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.artwork-layer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #0e1626;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.artwork-layer-row:hover {
+  background: #141f36;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.artwork-layer-row.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: #38bdf8;
+}
+
+.layer-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.layer-type-icon {
+  font-size: 13px;
+  color: #38bdf8;
+}
+
+.layer-name-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layer-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.layer-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 12px;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.layer-btn:hover {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.08);
+}
+.layer-btn.layer-del:hover {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* ---------------- Templates Grid ---------------- */
+
+.artwork-templates-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.artwork-template-card {
+  background: #0b111e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  text-align: left;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.artwork-template-card:hover {
+  transform: translateY(-2px);
+  border-color: #38bdf8;
+}
+
+.tpl-thumb {
+  width: 100%;
+  aspect-ratio: 16/9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tpl-thumb-icon {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.tpl-name {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+/* ---------------- Gradients & Solids ---------------- */
+
+.artwork-gradients-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.artwork-grad-chip {
+  height: 48px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  padding: 6px;
+  text-align: left;
+}
+.artwork-grad-chip span {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.artwork-solids-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.artwork-solid-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.artwork-solid-dot:hover {
+  transform: scale(1.15);
+  border-color: #38bdf8;
+}
+
+/* ---------------- TMDB Results Grid ---------------- */
+
+.artwork-tmdb-results {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.tmdb-card-item {
+  background: #060911;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.tmdb-card-item:hover {
+  border-color: #38bdf8;
+}
+
+.tmdb-card-item img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+}
+
+.tmdb-card-title {
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------- Glyphs & Shapes ---------------- */
+
+.artwork-glyphs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.glyph-btn {
+  background: #0b111e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #f1f5f9;
+  font-size: 16px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.glyph-btn:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+/* ---------------- Variations Drawer ---------------- */
+
+.artwork-variations-drawer {
+  position: absolute;
+  bottom: 0;
+  left: 72px;
+  right: 290px;
+  background: #0b111e;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+}
+
+.artwork-variations-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.artwork-variations-header h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.artwork-variations-strip {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  overflow-x: auto;
+}
+
+.variation-card {
+  width: 140px;
+  background: #060911;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.variation-card:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+}
+.variation-card.active {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px #38bdf8;
+}
+
+.variation-thumb {
+  width: 100%;
+  background: #04070e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.variation-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.variation-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+/* ---------------- Nuvio Simulation View ---------------- */
+
+.artwork-nuvio-simulation-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: #04070e;
+}
+
+.artwork-nuvio-sim-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0b111e;
+}
+
+.nuvio-sim-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.artwork-sub-pills {
+  display: flex;
+  gap: 4px;
+}
+
+.artwork-sub-pill {
+  background: #060911;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.artwork-sub-pill.active {
+  background: #1e293b;
+  color: #38bdf8;
+  border-color: #38bdf8;
+}
+
+.artwork-nuvio-sim-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 24px;
+}
+
+/* Isolated Card Mode */
+.nuvio-sim-isolated-card-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.nuvio-sim-card-container {
+  width: 320px;
+  max-width: 90vw;
+}
+.nuvio-sim-card-container.shape-poster {
+  width: 220px;
+}
+.nuvio-sim-card-container.shape-portrait {
+  width: 240px;
+}
+.nuvio-sim-card-container.shape-square {
+  width: 260px;
+}
+
+.nuvio-sim-card-container .nuvio-preview-folder-card {
+  width: 100%;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6);
+}
+
+.nuvio-sim-card-info {
+  text-align: center;
+}
+.nuvio-sim-badge {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Shelf Mode */
+.nuvio-sim-shelf-wrap {
+  width: 900px;
+  max-width: 90vw;
+  background: #070b14;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.nuvio-sim-active-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* TV Mode */
+.nuvio-sim-tv-bezel {
+  width: 880px;
+  max-width: 92vw;
+  aspect-ratio: 16/9;
+  background: #11141c;
+  border: 10px solid #1a202c;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 80px rgba(56, 189, 248, 0.15);
+  position: relative;
+  display: flex;
+  overflow: hidden;
+}
+
+.nuvio-sim-tv-screen {
+  flex: 1;
+  background: #04070e;
+  display: flex;
+  overflow: hidden;
+}
+
+.nuvio-sim-tv-sidebar {
+  width: 56px;
+  background: #070b14;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+  gap: 16px;
+}
+
+.nuvio-sim-tv-logo {
+  font-weight: 900;
+  font-size: 18px;
+  color: #38bdf8;
+}
+
+.nuvio-sim-tv-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tv-nav-item {
+  font-size: 16px;
+  color: #64748b;
+  cursor: pointer;
+}
+.tv-nav-item.active {
+  color: #38bdf8;
+}
+
+.nuvio-sim-tv-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nuvio-sim-tv-hero {
+  height: 48%;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 20px;
+}
+.tv-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.tv-hero-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, #04070e 0%, rgba(4, 7, 14, 0.5) 60%, transparent 100%);
+}
+.tv-hero-info {
+  position: relative;
+  z-index: 2;
+}
+.tv-hero-tag {
+  font-size: 9px;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: 0.05em;
+}
+.tv-hero-title {
+  margin: 2px 0;
+  font-size: 20px;
+  font-weight: 900;
+  color: #ffffff;
+}
+.tv-hero-sub {
+  margin: 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.nuvio-sim-tv-rail-wrap {
+  flex: 1;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tv-scale .nuvio-preview-folder-card {
+  width: 130px;
+}
+
+/* ---------------- Floating Studio Toast ---------------- */
+
+.artwork-studio-toast {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0b1322;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
+  padding: 10px 18px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 1200;
+  animation: toastFadeIn 0.25s ease-out;
+  color: #f1f5f9;
+  font-size: 13px;
+  max-width: 90vw;
+}
+
+@keyframes toastFadeIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.artwork-studio-toast.is-success {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: #061913;
+}
+
+.artwork-studio-toast.is-error {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: #1c0a0d;
+}
+
+.artwork-toast-icon {
+  font-weight: 800;
+  color: #34d399;
+}
+.artwork-studio-toast.is-error .artwork-toast-icon {
+  color: #f87171;
+}
+
+.artwork-toast-msg {
+  font-weight: 500;
+}
+
+.artwork-toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+/* ---------------- Enhanced Export Dialog ---------------- */
+
+.artwork-export-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+
+.artwork-export-box {
+  width: 660px;
+  max-width: 95vw;
+  max-height: 90vh;
+  background: #0b111e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.artwork-export-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.artwork-export-title-wrap h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.artwork-export-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+  display: block;
+}
+
+.artwork-export-body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .artwork-export-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.artwork-export-preview-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.artwork-export-preview-frame {
+  position: relative;
+  background: #050811;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 220px;
+}
+
+.artwork-export-preview-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.artwork-export-preview-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.artwork-export-specs {
+  background: #060911;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.artwork-export-spec-item {
+  display: flex;
+  justify-content: space-between;
+}
+.artwork-export-spec-item span {
+  color: #64748b;
+}
+.artwork-export-spec-item strong {
+  color: #cbd5e1;
+}
+
+.artwork-export-settings-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.artwork-export-target-info {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #93c5fd;
+  display: flex;
+  gap: 4px;
+  flex-direction: column;
+}
+.artwork-export-target-info strong {
+  color: #ffffff;
+}
+
+.artwork-export-feedback {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.artwork-export-feedback.is-success {
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  color: #34d399;
+}
+.artwork-export-feedback.is-error {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #f87171;
+}
+
+.artwork-export-footer {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #080c16;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.artwork-export-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
