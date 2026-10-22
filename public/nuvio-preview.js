@@ -4,48 +4,9 @@
 (() => {
   'use strict';
 
-  const DEFAULT_HERO_SLIDES = [
-    {
-      id: 'hero-obsessao',
-      name: 'Obsessão',
-      meta: 'Terror • Suspense • 2026',
-      description: 'Ao desejar a felicidade eterna ao lado da esposa, um romântico incurável acaba preso em um pesadelo sombrio onde cada escolha cobra um preço irreversível.',
-      background: 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg',
-      poster: 'https://image.tmdb.org/t/p/w780/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
-      type: 'movie',
-      year: 2026
-    },
-    {
-      id: 'hero-dia-d',
-      name: 'Dia D',
-      meta: 'Ação • Guerra • Drama • 2026',
-      description: 'Nas horas decisivas que antecedem a maior operação anfíbia da história, um esquadrão infiltrado precisa neutralizar a linha de defesa costeira antes do amanhecer.',
-      background: 'https://image.tmdb.org/t/p/w1280/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg',
-      poster: 'https://image.tmdb.org/t/p/w780/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg',
-      type: 'movie',
-      year: 2026
-    },
-    {
-      id: 'hero-ruptura',
-      name: 'Ruptura',
-      meta: 'Mistério • Ficção Científica • 2025',
-      description: 'Funcionários de uma corporação biotecnológica passam por um procedimento cirúrgico que separa suas memórias pessoais das memórias de trabalho.',
-      background: 'https://image.tmdb.org/t/p/w1280/ixgFmf1X59PUZam2qbAfskx2gQr.jpg',
-      poster: 'https://image.tmdb.org/t/p/w780/lFf6LLrQjYldcZItzOkGmMMigP7.jpg',
-      type: 'series',
-      year: 2025
-    },
-    {
-      id: 'hero-last-of-us',
-      name: 'The Last of Us',
-      meta: 'Drama • Ação • Pós-Apocalíptico • 2025',
-      description: 'Vinte anos após a destruição da civilização moderna por um fungo mutante, um sobrevivente endurecido é contratado para escoltar uma jovem através de um país devastado.',
-      background: 'https://image.tmdb.org/t/p/w1280/uDgy6hyPd82kOHh6I95FLtLnj6p.jpg',
-      poster: 'https://image.tmdb.org/t/p/w780/uKvVjHNqB5VmOrdxqAt2F7J78ED.jpg',
-      type: 'series',
-      year: 2025
-    }
-  ];
+  // O simulador só utiliza títulos e capas do workspace real.
+  // Destaques inexistentes aparecem como vazio informativo, nunca como títulos fictícios.
+  const DEFAULT_HERO_SLIDES = [];
 
   const ui = {
     active: false,
@@ -213,31 +174,8 @@
   }
 
   function hydrateHeroSlidesFromWorkspace() {
-    const customSlides = [];
-    const workspaceCatalogs = ctx?.state?.workspace?.catalogs || [];
-    for (const cat of workspaceCatalogs) {
-      for (const m of cat.metas || []) {
-        const bg = url(m.background || m.backdrop || m.poster);
-        if (!bg || !m.name) continue;
-        const genres = Array.isArray(m.genres) && m.genres.length ? m.genres.slice(0, 2).join(' • ') : (m.type === 'series' ? 'Série' : 'Filme');
-        const yearStr = m.year ? String(m.year) : '2025';
-        customSlides.push({
-          id: m.id || m.name,
-          name: m.name,
-          meta: `${genres} • ${yearStr}`,
-          description: m.description || `Destaque selecionado do catálogo ${cat.name || 'do Hub'}.`,
-          background: bg,
-          poster: url(m.poster) || bg,
-          type: m.type || cat.type || 'movie',
-          year: m.year || 2025
-        });
-        if (customSlides.length >= 5) break;
-      }
-      if (customSlides.length >= 5) break;
-    }
-    ui.heroSlides = customSlides.length >= 2
-      ? customSlides
-      : [...customSlides, ...DEFAULT_HERO_SLIDES].slice(0, 5);
+    const catalogs = ctx?.state?.workspace?.catalogs || [];
+    ui.heroSlides = globalThis.NuvioPreviewData?.heroSlidesFromCatalogs(catalogs, url) || [];
     if (ui.heroIndex >= ui.heroSlides.length) ui.heroIndex = 0;
   }
 
@@ -322,6 +260,8 @@
     ui.search = '';
     ui.searchOpen = false;
     ui.heroIndex = 0;
+    abort();
+    ui.cache.clear();
     hydrateHeroSlidesFromWorkspace();
     document.body.classList.add('nuvio-preview-open');
     draw({ resetScroll: true });
@@ -416,7 +356,7 @@
             year: it.year
           }));
         if (fetchedSlides.length) {
-          const merged = [...fetchedSlides, ...DEFAULT_HERO_SLIDES];
+          const merged = [...fetchedSlides, ...ui.heroSlides];
           const unique = [];
           const seen = new Set();
           for (const s of merged) {
@@ -493,11 +433,16 @@
   }
 
   function renderHeroCarousel() {
-    const slides = ui.heroSlides.length ? ui.heroSlides : DEFAULT_HERO_SLIDES;
-    const current = slides[ui.heroIndex] || slides[0];
-    const bgUrl = url(current.background || current.poster);
+    const slides = ui.heroSlides;
     const firstGroup = groups()[0];
     const firstFolder = firstGroup?.folders?.[0];
+    const current = slides[ui.heroIndex] || slides[0] || {
+      name: firstGroup?.title || 'Sua biblioteca',
+      meta: `${groups().length} coleções • ${totalFolders()} pastas`,
+      description: 'Nenhum destaque real disponível. Configure capas e catálogos para preencher esta área.',
+      background: firstGroup?.backdropImageUrl || firstFolder?.coverImageUrl || ''
+    };
+    const bgUrl = url(current.background || current.poster);
 
     return (
       '<section class="nuvio-preview-hero nuvio-preview-hero-carousel" aria-label="Destaque da tela inicial">' +
@@ -512,7 +457,7 @@
       esc(current.name) +
       '</h2>' +
       '<div class="nuvio-preview-hero-meta">' +
-      esc(current.meta || 'Filme • 2026') +
+      esc(current.meta || 'Conteúdo da biblioteca') +
       '</div>' +
       '<p class="nuvio-preview-hero-desc">' +
       esc(current.description || '') +
@@ -523,8 +468,8 @@
           esc(firstGroup.id) +
           '" data-id="' +
           esc(firstFolder.id) +
-          '">Ver Detalhes</button>'
-        : '<button type="button" class="nuvio-preview-hero-cta" data-pv-action="hero-next">Ver Detalhes</button>') +
+          '">Abrir primeira pasta</button>'
+        : '') +
       '</div>' +
       '</div>' +
       '<div class="nuvio-preview-hero-dots" role="tablist" aria-label="Destaques">' +
@@ -616,6 +561,7 @@
         )
         .join('') +
       '</div>' +
+      (ui.result.pageUnsupported ? '<p class="nuvio-preview-page-note" role="status">A origem não respeitou a paginação. Exibindo apenas títulos confirmados.</p>' : '') +
       (ui.result.hasMore || ui.page > 0
         ? '<div class="nuvio-preview-pagination">' +
           '<button type="button" data-pv-action="previous" ' +

@@ -15,7 +15,7 @@ COPY public ./public
 USER node
 
 # Porta padrão do serviço
-EXPOSE 7001
+EXPOSE 7001 7002
 
 ENV NODE_ENV=production
 ENV PORT=7001

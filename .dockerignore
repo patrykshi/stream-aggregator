@@ -18,3 +18,5 @@ docs
 scripts
 .env*
 *.tar.gz
+# Gravações pessoais não podem entrar nas imagens distribuídas.
+public/assets/aistudio/*.mp4

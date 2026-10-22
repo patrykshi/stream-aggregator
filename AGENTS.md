@@ -10,7 +10,7 @@ Este documento define as diretrizes operacionais, os papéis da equipe de agente
 * **Backend:** Node.js em modo nativo ES Modules (`"type": "module"`), Express 4.21, sem transpilador ou bundler.
 * **Frontend:** Vanilla JavaScript puro (`public/app.js`, `public/ui-selects.js`, `public/collection-links.js`, `public/nuvio-preview.js`), Dark Mode CSS (`public/styles.css`) e HTML5 sem frameworks pesados.
 * **Dados & Cache:** Pasta `data/` com perfis (`profiles.json`), cache de catálogos e integrações externas (TMDB, Trakt, MDBList, ERDB).
-* **Infraestrutura:** Docker Compose com porta vinculada ao loopback `127.0.0.1:7001` e Cloudflare Tunnel (`cloudflared`) servindo `stream.patrykrocha.com` em modo somente-leitura.
+* **Infraestrutura:** Docker Compose com porta vinculada ao loopback `127.0.0.1:7001` e Cloudflare Tunnel (`cloudflared`) usando exclusivamente `stream-aggregator:7002` (ingress de leitura com allowlist); a interface administrativa fica em `127.0.0.1:7001`.
 
 ---
 
@@ -20,7 +20,7 @@ Este documento define as diretrizes operacionais, os papéis da equipe de agente
 > Qualquer agente atuando neste projeto **DEVE** respeitar rigorosamente os seguintes invariantes:
 
 1. **Zero Regressão de Testes:**
-   * A suíte nativa `npm test` (`node --test test/*.test.js`) deve sempre passar com 100% de sucesso (baseline de 168+ testes).
+   * A suíte nativa `npm test` (`node --test test/*.test.js`) deve sempre passar com 100% de sucesso (baseline atual de 200+ testes).
    * Nenhuma alteração pode ser considerada concluída se algum teste falhar.
 2. **Segurança de Mutação e Isolamento Local (`requireLocalEdit`):**
    * Todas as rotas que gravam ou alteram configurações (`POST`, `PUT`, `DELETE`) **DEVEM** utilizar o middleware `requireLocalEdit`.

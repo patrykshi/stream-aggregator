@@ -208,7 +208,7 @@ export async function validateAddonManifestOnServer(rawUrl, {
       lastResponse = await fetchImpl(parsed.manifestUrl, {
         signal: controller.signal,
         headers,
-        redirect: 'follow'
+        redirect: 'error'
       });
       if (lastResponse.ok) break;
       // Repete com próximo perfil de User-Agent/Origin apenas em erros de bloqueio/autorização HTTP
@@ -264,40 +264,27 @@ export async function validateAddonManifestOnServer(rawUrl, {
  */
 export function isLocalEditorRequest(req, currentPort = 7001) {
   const getHeader = name => (typeof req?.get === 'function' ? req.get(name) : req?.headers?.[name.toLowerCase()]);
-  if (getHeader('cf-connecting-ip') || getHeader('cf-ew-via')) return false;
-
-  const host = String(getHeader('host') || '').split(':')[0].trim().toLowerCase();
-  const isLoopbackHost = ['127.0.0.1', 'localhost', '[::1]'].includes(host);
-  if (!isLoopbackHost) return false;
-
-  const forwardedHostRaw = String(getHeader('x-forwarded-host') || '').split(',')[0].trim().toLowerCase();
-  const forwardedHostname = forwardedHostRaw.split(':')[0];
-  if (forwardedHostname === 'stream.patrykrocha.com') return false;
-
-  const secFetchSite = String(getHeader('sec-fetch-site') || '').trim().toLowerCase();
+  // Proxies e túneis nunca podem atuar como a interface de administração.
+  if (['cf-connecting-ip', 'cf-ew-via', 'forwarded', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-for', 'x-original-host']
+    .some(header => getHeader(header))) return false;
+  const rawHost = String(getHeader('host') || '').trim();
+  let host;
+  try {
+    host = new URL('http://' + rawHost);
+  } catch { return false; }
+  const accepted = new Set(['127.0.0.1', 'localhost', '[::1]']);
+  if (!accepted.has(host.hostname.toLowerCase())) return false;
+  if (host.port && host.port !== String(currentPort)) return false;
+  const fetchSite = String(getHeader('sec-fetch-site') || '').toLowerCase();
+  if (fetchSite && !['same-origin', 'none'].includes(fetchSite)) return false;
   const origin = getHeader('origin');
   if (origin) {
-    if (origin === 'null') {
-      return secFetchSite === 'same-origin';
-    }
     try {
-      const u = new URL(origin);
-      const originHostname = u.hostname.toLowerCase();
-      const allowedPorts = new Set(['7001', '3000', '8080', String(currentPort)]);
-      const isLocalOrigin = ['127.0.0.1', 'localhost', '[::1]'].includes(originHostname) &&
-        (!u.port || allowedPorts.has(u.port));
-      const isForwardedMatch = Boolean(forwardedHostRaw) && (
-        u.host.toLowerCase() === forwardedHostRaw ||
-        originHostname === forwardedHostname
-      );
-      const isSameOriginPreview = (secFetchSite === 'same-origin' || secFetchSite === 'same-site') &&
-        (originHostname.endsWith('.run.app') || originHostname.endsWith('.google.com'));
-      if (!isLocalOrigin && !isForwardedMatch && !isSameOriginPreview) return false;
-    } catch {
-      return false;
-    }
+      const source = new URL(origin);
+      if (!accepted.has(source.hostname.toLowerCase()) ||
+          source.protocol !== 'http:' ||
+          (source.port || '80') !== (host.port || '80')) return false;
+    } catch { return false; }
   }
   return true;
 }
-
-
