@@ -102,6 +102,7 @@
     }
 
     drawOverlays() {
+      if (this.isExporting) return;
       const ctx = this.fCanvas.contextContainer;
       if (!ctx) return;
 
@@ -741,7 +742,14 @@
     }
 
     exportToDataUrl(format = 'webp', quality = 0.90) {
-      // Export at native 1x resolution independent of current zoom
+      // 1. Deselect active element to remove handles and bounding boxes from export
+      const activeObj = this.fCanvas.getActiveObject();
+      this.fCanvas.discardActiveObject();
+
+      // 2. Suppress guides, safe margins, and overlays
+      this.isExporting = true;
+
+      // 3. Export at native 1x resolution independent of current zoom
       const currentZoom = this.fCanvas.getZoom();
       const currentWidth = this.fCanvas.getWidth();
       const currentHeight = this.fCanvas.getHeight();
@@ -750,18 +758,24 @@
       this.fCanvas.setZoom(1);
       this.fCanvas.setWidth(this.width);
       this.fCanvas.setHeight(this.height);
+      this.fCanvas.renderAll();
 
       const mimeType = format === 'png' ? 'image/png' : format === 'jpeg' || format === 'jpg' ? 'image/jpeg' : 'image/webp';
+      const fabricFormat = mimeType === 'image/jpeg' ? 'jpeg' : mimeType === 'image/png' ? 'png' : 'webp';
       const dataUrl = this.fCanvas.toDataURL({
-        format: mimeType.split('/')[1],
-        quality: Number(quality) || 0.90,
+        format: fabricFormat,
+        quality: Math.max(0.1, Math.min(1, Number(quality) || 0.90)),
         multiplier: 1
       });
 
-      // Restore zoom
+      // 4. Restore zoom and selection state
+      this.isExporting = false;
       this.fCanvas.setZoom(currentZoom);
       this.fCanvas.setWidth(currentWidth);
       this.fCanvas.setHeight(currentHeight);
+      if (activeObj) {
+        this.fCanvas.setActiveObject(activeObj);
+      }
       this.fCanvas.requestRenderAll();
 
       return dataUrl;

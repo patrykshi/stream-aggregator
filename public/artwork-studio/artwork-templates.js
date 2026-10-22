@@ -66,6 +66,15 @@
           isTitle: true
         });
         canvas.addShape('line', { fill: '#38bdf8', strokeWidth: 3, top: canvas.height * 0.83 });
+        canvas.addText({
+          text: 'COLEÇÃO DE FILMES & SÉRIES',
+          fontSize: Math.round(canvas.height * 0.04),
+          fontFamily: 'Manrope',
+          fontWeight: '600',
+          fill: '#94a3b8',
+          top: canvas.height * 0.88,
+          isSubtitle: true
+        });
       }
     },
     {

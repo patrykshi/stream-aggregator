@@ -393,4 +393,49 @@ describe('Artwork Studio 2.0: Reconstrução Completa do Estúdio Visual', () =>
     assert.equal(isPublicReadRoute('POST', '/api/hub/artwork/assets'), false);
     assert.equal(isPublicReadRoute('DELETE', '/api/hub/artwork/projects/1'), false);
   });
+
+  it('Teste L — Separação de Operações: Salvar Projeto persiste documento editável sem gerar download ou alterar coleção', async () => {
+    const project = saveProject({
+      id: 'proj_op_a',
+      name: 'Projeto Autônomo',
+      shape: 'LANDSCAPE',
+      target: { kind: 'folder', id: 'f_op_a', title: 'Documentários' },
+      canvasDoc: {
+        background: { type: 'solid', primary: '#020617' },
+        objects: [
+          { type: 'textbox', text: 'DESCOBRIR', fontSize: 64, fill: '#38bdf8' },
+          { type: 'line', fill: '#38bdf8', strokeWidth: 3 }
+        ]
+      }
+    });
+
+    assert.equal(project.id, 'proj_op_a');
+    assert.equal(project.name, 'Projeto Autônomo');
+
+    // Recupera e valida integridade das camadas
+    const retrieved = getProject('proj_op_a');
+    assert.equal(retrieved.name, 'Projeto Autônomo');
+    assert.equal(retrieved.canvasDoc.objects.length, 2);
+    assert.equal(retrieved.canvasDoc.objects[0].text, 'DESCOBRIR');
+  });
+
+  it('Teste M — Separação de Operações: Salvar e Aplicar persiste no workspace e atualiza URL', async () => {
+    const rawImage = await sharp({
+      create: { width: 1280, height: 720, channels: 4, background: '#090d16' }
+    }).webp().toBuffer();
+    const dataUrl = `data:image/webp;base64,${rawImage.toString('base64')}`;
+
+    const exported = await exportArtworkFromDataUrl({
+      dataUrl,
+      shape: 'LANDSCAPE',
+      format: 'webp',
+      quality: 90,
+      title: 'Descobrir Nuvio'
+    });
+
+    assert.match(exported.url, /^\/api\/hub\/artwork\/studio\/art_landscape_[a-f0-9]+\.webp$/);
+    assert.equal(exported.format, 'webp');
+    assert.equal(exported.width, 1280);
+    assert.equal(exported.height, 720);
+  });
 });

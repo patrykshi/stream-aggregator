@@ -61,7 +61,6 @@
           if (onApply) {
             await onApply(result);
           }
-          close();
         },
         onClose: () => close()
       });

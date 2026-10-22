@@ -2672,9 +2672,15 @@ async function openArtworkStudioV2(targetKind='folder'){
      f.tileShape = appliedTileShape;
      f.hideTitle = Boolean(result.hideTitle);
     }
-    markDirty();
+    // Persiste imediatamente no workspace do Hub para gravar no disco e limpar o estado pendente
+    const body = { revision: state.workspace.revision, catalogs: catalogs(), collections: groups() };
+    const savedWs = await request('/api/hub/workspace', { method: 'PUT', body: JSON.stringify(body) });
+    state.workspace.revision = savedWs.revision;
+    state.dirty = false;
+    updateChrome();
     render();
-    notify(`Capa ${result.shape || ''} salva localmente e aplicada com sucesso!`);
+    notify(`Capa ${result.shape || ''} salva no Hub e vinculada com sucesso no Nuvio!`);
+    return { ok: true, revision: savedWs.revision };
    }
   });
  }

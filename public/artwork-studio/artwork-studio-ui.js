@@ -77,10 +77,13 @@
               <button type="button" class="btn btn-ghost" id="artBtnVariations" title="Comparar Versões Alternativas">
                 ❖ Variações (<span id="artVariationsCount">1</span>)
               </button>
-              <button type="button" class="btn btn-subtle" id="artBtnExport">
+              <button type="button" class="btn btn-subtle" id="artBtnExport" title="Exportar ou Baixar Imagem">
                 ⬇ Exportar
               </button>
-              <button type="button" class="btn btn-primary" id="artBtnSaveAndApply">
+              <button type="button" class="btn btn-subtle" id="artBtnSaveProject" title="Salvar Projeto Editável">
+                💾 Salvar Projeto
+              </button>
+              <button type="button" class="btn btn-primary" id="artBtnSaveAndApply" title="Salvar e Vincular à Coleção">
                 ✦ Salvar e Aplicar
               </button>
             </div>
@@ -206,35 +209,74 @@
             </div>
           </div>
 
-          <!-- Export Modal -->
+          <!-- Enhanced Export Modal -->
           <div class="artwork-export-dialog" id="artworkExportDialog" hidden>
             <div class="artwork-export-box">
               <div class="artwork-export-head">
-                <h3>Exportar Imagem</h3>
-                <button type="button" class="btn btn-ghost btn-icon btn-small" id="artBtnCloseExport">✕</button>
+                <div class="artwork-export-title-wrap">
+                  <h3>Exportar Imagem</h3>
+                  <span class="artwork-export-subtitle">Gere o arquivo final de imagem ou aplique diretamente no Nuvio</span>
+                </div>
+                <button type="button" class="btn btn-ghost btn-icon btn-small" id="artBtnCloseExport" title="Fechar">✕</button>
               </div>
-              <div class="artwork-export-form">
-                <label class="field">
-                  <span>Formato de Imagem</span>
-                  <select id="artExportFormat">
-                    <option value="webp" selected>WebP (Recomendado para Stremio/Nuvio)</option>
-                    <option value="png">PNG (Sem perdas, alta fidelidade)</option>
-                    <option value="jpeg">JPEG (Compatibilidade máxima)</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Qualidade (<span id="artExportQualityVal">90</span>%)</span>
-                  <input type="range" id="artExportQuality" min="60" max="100" value="90">
-                </label>
-                <div class="artwork-export-info" id="artExportInfo">
-                  Dimensões: 1280 × 720 px · Proporção: 16:9
+
+              <div class="artwork-export-body">
+                <!-- Coluna Esquerda: Prévia em Tempo Real e Specs -->
+                <div class="artwork-export-preview-column">
+                  <div class="artwork-export-preview-frame" id="artExportPreviewFrame">
+                    <img id="artExportPreviewImg" alt="Prévia da exportação" src="">
+                    <span class="artwork-export-preview-badge" id="artExportBadge">WEBP · 90%</span>
+                  </div>
+                  <div class="artwork-export-specs" id="artExportSpecs">
+                    <!-- Dimensões, Proporção e Status -->
+                  </div>
+                </div>
+
+                <!-- Coluna Direita: Opções de Formato e Qualidade -->
+                <div class="artwork-export-settings-column">
+                  <label class="field">
+                    <span>Formato de Imagem</span>
+                    <select id="artExportFormat">
+                      <option value="webp" selected>WebP (Recomendado · Alto desempenho no Nuvio)</option>
+                      <option value="png">PNG (Sem perdas · Máxima fidelidade e nitidez)</option>
+                      <option value="jpeg">JPEG (Compatibilidade ampla com players legados)</option>
+                    </select>
+                  </label>
+
+                  <label class="field">
+                    <span>Qualidade (<strong id="artExportQualityVal">90%</strong>)</span>
+                    <input type="range" id="artExportQuality" min="60" max="100" value="90">
+                    <small class="field-desc" id="artExportQualityDesc">Alta fidelidade visual com excelente compressão para Nuvio e Stremio.</small>
+                  </label>
+
+                  <div class="artwork-export-target-info" id="artExportTargetInfo">
+                    <!-- Preenchido dinamicamente com o destino da capa -->
+                  </div>
+
+                  <div class="artwork-export-feedback" id="artExportFeedback" hidden></div>
                 </div>
               </div>
-              <div class="artwork-export-actions">
-                <button type="button" class="btn btn-subtle" id="artBtnDownloadImage">Baixar Arquivo</button>
-                <button type="button" class="btn btn-primary" id="artBtnApplyExported">Exportar e Aplicar</button>
+
+              <div class="artwork-export-footer">
+                <button type="button" class="btn btn-ghost" id="artBtnCancelExport">Cancelar</button>
+                <div class="artwork-export-actions-right">
+                  <button type="button" class="btn btn-subtle" id="artBtnDownloadImage" title="Baixar imagem no seu computador">
+                    ⬇ Baixar Arquivo
+                  </button>
+                  <button type="button" class="btn btn-primary" id="artBtnApplyExported" title="Salvar e vincular capa no Hub">
+                    ✦ Salvar e Aplicar
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
+
+          <!-- Floating Studio Toast -->
+          <div class="artwork-studio-toast" id="artworkStudioToast" hidden>
+            <span class="artwork-toast-icon" id="artToastIcon">✓</span>
+            <span class="artwork-toast-msg" id="artToastMsg">Projeto salvo com sucesso!</span>
+            <div class="artwork-toast-actions" id="artToastActions"></div>
+            <button type="button" class="btn btn-ghost btn-icon btn-small" id="artBtnCloseToast" title="Fechar notificação">✕</button>
           </div>
         </div>
       `;
@@ -271,13 +313,19 @@
 
     bindEvents() {
       // Topbar Actions
-      this.$('#artBtnBack').addEventListener('click', () => this.onClose());
+      this.$('#artBtnBack').addEventListener('click', () => this.handleClose());
       this.$('#artProjectTitle').addEventListener('input', e => {
         if (this.currentProject) {
           this.currentProject.name = e.target.value;
           this.setDirty();
         }
       });
+
+      // Save Project (Editable Document)
+      this.$('#artBtnSaveProject').addEventListener('click', () => this.handleSaveProject());
+
+      // Save and Apply CTA (Direct Hub integration)
+      this.$('#artBtnSaveAndApply').addEventListener('click', () => this.handleSaveAndApply());
 
       // Undo / Redo
       this.$('#artBtnUndo').addEventListener('click', () => this.handleUndo());
@@ -310,14 +358,14 @@
       // Export modal
       this.$('#artBtnExport').addEventListener('click', () => this.openExportModal());
       this.$('#artBtnCloseExport').addEventListener('click', () => this.closeExportModal());
+      this.$('#artBtnCancelExport')?.addEventListener('click', () => this.closeExportModal());
       this.$('#artBtnDownloadImage').addEventListener('click', () => this.downloadExported());
       this.$('#artBtnApplyExported').addEventListener('click', () => this.applyExported());
-      this.$('#artExportQuality').addEventListener('input', e => {
-        this.$('#artExportQualityVal').textContent = e.target.value;
-      });
+      this.$('#artExportFormat')?.addEventListener('change', () => this.updateExportModalPreview());
+      this.$('#artExportQuality')?.addEventListener('input', () => this.updateExportModalPreview());
 
-      // Save and Apply CTA
-      this.$('#artBtnSaveAndApply').addEventListener('click', () => this.handleSaveAndApply());
+      // Toast close
+      this.$('#artBtnCloseToast')?.addEventListener('click', () => this.hideToast());
 
       // Left Tool Rail
       this.container.querySelectorAll('[data-tool]').forEach(btn => {
@@ -1591,88 +1639,274 @@
       this.setDirty();
     }
 
-    /* ---------------- Export Modal & Actions ---------------- */
+    /* ---------------- Navigation & Close Guard ---------------- */
 
-    openExportModal() {
-      const modal = this.$('#artworkExportDialog');
-      const info = this.$('#artExportInfo');
-      if (!modal) return;
-      modal.hidden = false;
-      const spec = globalThis.ArtworkStudioModel.getShapeSpec(this.currentProject?.shape);
-      if (info) {
-        info.textContent = `Dimensões: ${spec.width} × ${spec.height} px · Proporção: ${spec.ratio}`;
+    handleClose() {
+      if (this.isDirty) {
+        const leave = window.confirm('Você tem alterações não salvas no projeto do Artwork Studio. Deseja realmente sair e descartar as alterações?');
+        if (!leave) return;
+      }
+      this.onClose();
+    }
+
+    /* ---------------- Floating Toast Notifications ---------------- */
+
+    showToast({ message, type = 'success', actions = [], duration = 7000 } = {}) {
+      const toast = this.$('#artworkStudioToast');
+      const msg = this.$('#artToastMsg');
+      const icon = this.$('#artToastIcon');
+      const actionsWrap = this.$('#artToastActions');
+      if (!toast || !msg) return;
+
+      clearTimeout(this.toastTimer);
+      toast.className = `artwork-studio-toast is-${type}`;
+      msg.textContent = message;
+      if (icon) {
+        icon.textContent = type === 'success' ? '✓' : type === 'error' ? '⚠' : 'ℹ';
+      }
+
+      if (actionsWrap) {
+        actionsWrap.innerHTML = '';
+        actions.forEach(act => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `btn btn-small ${act.primary ? 'btn-primary' : 'btn-subtle'}`;
+          btn.textContent = act.label;
+          btn.addEventListener('click', () => {
+            this.hideToast();
+            if (act.onClick) act.onClick();
+          });
+          actionsWrap.appendChild(btn);
+        });
+      }
+
+      toast.hidden = false;
+      if (duration > 0) {
+        this.toastTimer = setTimeout(() => this.hideToast(), duration);
       }
     }
 
-    closeExportModal() {
-      this.$('#artworkExportDialog').hidden = true;
+    hideToast() {
+      clearTimeout(this.toastTimer);
+      const toast = this.$('#artworkStudioToast');
+      if (toast) toast.hidden = true;
     }
 
-    async downloadExported() {
-      const format = this.$('#artExportFormat')?.value || 'webp';
-      const quality = Number(this.$('#artExportQuality')?.value) || 90;
-      const dataUrl = this.canvas.exportToDataUrl(format, quality / 100);
+    /* ---------------- State Management & Save Status ---------------- */
 
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = `${this.currentProject?.name || 'capa'}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      this.closeExportModal();
+    setSaveStatus(status, textOverride = null) {
+      this.saveStatus = status;
+      const isBusy = ['saving', 'exporting', 'applying'].includes(status);
+
+      // Disable conflicting action buttons during busy operations (prevents duplicate clicks)
+      const saveBtn = this.$('#artBtnSaveProject');
+      const applyBtn = this.$('#artBtnSaveAndApply');
+      const exportBtn = this.$('#artBtnExport');
+      const modalDownloadBtn = this.$('#artBtnDownloadImage');
+      const modalApplyBtn = this.$('#artBtnApplyExported');
+
+      if (saveBtn) saveBtn.disabled = isBusy;
+      if (applyBtn) applyBtn.disabled = isBusy;
+      if (exportBtn) exportBtn.disabled = isBusy;
+      if (modalDownloadBtn) modalDownloadBtn.disabled = isBusy;
+      if (modalApplyBtn) modalApplyBtn.disabled = isBusy;
+
+      const pill = this.$('#artSaveStatusPill');
+      if (!pill) return;
+
+      pill.className = `artwork-save-status-pill is-${status}`;
+      if (textOverride) {
+        pill.textContent = textOverride;
+        return;
+      }
+
+      switch (status) {
+        case 'saving':
+          pill.textContent = 'Salvando projeto...';
+          break;
+        case 'exporting':
+          pill.textContent = 'Exportando imagem...';
+          break;
+        case 'applying':
+          pill.textContent = 'Aplicando no Hub...';
+          break;
+        case 'saved':
+          this.isDirty = false;
+          pill.textContent = '✓ Salvo';
+          break;
+        case 'dirty':
+          this.isDirty = true;
+          pill.textContent = '● Modificado';
+          break;
+        case 'error':
+          pill.textContent = '⚠ Erro ao salvar';
+          break;
+        default:
+          pill.textContent = '✓ Salvo';
+      }
     }
-
-    async applyExported() {
-      this.closeExportModal();
-      await this.handleSaveAndApply();
-    }
-
-    /* ---------------- Save & Apply ---------------- */
 
     setDirty() {
-      this.isDirty = true;
-      this.saveStatus = 'dirty';
-      const pill = this.$('#artSaveStatusPill');
-      if (pill) {
-        pill.textContent = 'Modificado';
-        pill.className = 'artwork-save-status-pill is-dirty';
-      }
+      this.setSaveStatus('dirty');
     }
 
-    setSaved() {
-      this.isDirty = false;
-      this.saveStatus = 'saved';
-      const pill = this.$('#artSaveStatusPill');
-      if (pill) {
-        pill.textContent = '✓ Salvo';
-        pill.className = 'artwork-save-status-pill is-saved';
-      }
+    setSaved(applied = false) {
+      this.setSaveStatus('saved', applied ? '✓ Salvo e Aplicado' : '✓ Salvo');
     }
 
-    async handleSaveAndApply() {
-      const btn = this.$('#artBtnSaveAndApply');
-      btn.disabled = true;
-      btn.textContent = 'Salvando e aplicando...';
+    /* ---------------- Operation A: Salvar Projeto ---------------- */
+
+    async handleSaveProject() {
+      if (['saving', 'applying', 'exporting'].includes(this.saveStatus)) return;
+      this.setSaveStatus('saving');
 
       try {
-        // 1. Export high-res raster image
-        const format = 'webp';
-        const dataUrl = this.canvas.exportToDataUrl(format, 0.90);
+        if (!this.currentProject) {
+          throw Error('Nenhum projeto ativo carregado no Artwork Studio.');
+        }
+
+        // 1. Sincroniza nome e documento do canvas
+        const titleInput = this.$('#artProjectTitle');
+        if (titleInput && titleInput.value.trim()) {
+          this.currentProject.name = titleInput.value.trim();
+        }
+        this.currentProject.canvasDoc = this.canvas.toJSON();
+        this.currentProject.updatedAt = new Date().toISOString();
+
+        // 2. Sincroniza variação ativa
+        const activeVar = this.currentProject.variations?.find(v => v.id === this.currentProject.activeVariationId);
+        if (activeVar) {
+          activeVar.canvasDoc = this.currentProject.canvasDoc;
+          activeVar.name = this.currentProject.name;
+        }
+
+        // 3. Persiste no backend (data/artwork-studio/projects/*.json sob 0600)
+        const res = await this.integrations.saveProject(this.currentProject);
+        if (res.project) {
+          this.currentProject = res.project;
+        }
+
+        this.setSaved(false);
+        this.showToast({
+          message: '✓ Projeto salvo com sucesso! Camadas e propriedades preservadas.',
+          type: 'success'
+        });
+      } catch (err) {
+        this.setSaveStatus('error');
+        this.showToast({
+          message: `Falha ao salvar projeto: ${err.message || err}`,
+          type: 'error',
+          duration: 10000
+        });
+      }
+    }
+
+    /* ---------------- Operation B: Baixar Imagem (Download Seguro) ---------------- */
+
+    async downloadExported() {
+      if (['saving', 'applying', 'exporting'].includes(this.saveStatus)) return;
+      this.setSaveStatus('exporting');
+      const downloadBtn = this.$('#artBtnDownloadImage');
+      const originalText = downloadBtn ? downloadBtn.textContent : '';
+      if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = 'Gerando download...';
+      }
+
+      try {
+        const format = String(this.$('#artExportFormat')?.value || 'webp').toLowerCase();
+        const quality = Number(this.$('#artExportQuality')?.value) || 90;
+        const dataUrl = this.canvas.exportToDataUrl(format, quality / 100);
+
+        // Converte base64 dataUrl para Blob para evitar top-navigation e disparo de beforeunload no Chromium
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        const filename = (this.currentProject?.name || 'capa')
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]+/gi, '_')
+          .replace(/^_+|_+$/g, '') || 'capa';
+
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = blobUrl;
+        a.download = `${filename}.${format === 'jpeg' ? 'jpg' : format}`;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        }, 1500);
+
+        // Feedback visual na própria janela de exportação
+        const feedback = this.$('#artExportFeedback');
+        if (feedback) {
+          feedback.textContent = `✓ Imagem baixada em ${format.toUpperCase()} (${quality}%) com sucesso.`;
+          feedback.className = 'artwork-export-feedback is-success';
+          feedback.hidden = false;
+        }
+      } catch (err) {
+        const feedback = this.$('#artExportFeedback');
+        if (feedback) {
+          feedback.textContent = `Erro ao gerar imagem: ${err.message || err}`;
+          feedback.className = 'artwork-export-feedback is-error';
+          feedback.hidden = false;
+        }
+      } finally {
+        this.setSaveStatus(this.isDirty ? 'dirty' : 'saved');
+        if (downloadBtn) {
+          downloadBtn.disabled = false;
+          downloadBtn.textContent = originalText || '⬇ Baixar Arquivo';
+        }
+      }
+    }
+
+    /* ---------------- Operation C: Salvar e Aplicar no Hub ---------------- */
+
+    async handleSaveAndApply(customOptions = {}) {
+      if (['saving', 'applying', 'exporting'].includes(this.saveStatus)) return;
+      this.setSaveStatus('applying');
+
+      const btn = this.$('#artBtnSaveAndApply');
+      const modalBtn = this.$('#artBtnApplyExported');
+      const originalText = btn ? btn.textContent : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Salvando e aplicando...';
+      }
+      if (modalBtn) {
+        modalBtn.disabled = true;
+        modalBtn.textContent = 'Aplicando no Hub...';
+      }
+
+      try {
+        const format = String(customOptions.format || this.$('#artExportFormat')?.value || 'webp').toLowerCase();
+        const quality = Number(customOptions.quality || this.$('#artExportQuality')?.value) || 90;
+
+        // 1. Renderiza arte final em alta resolução sem guias/margens
+        const dataUrl = this.canvas.exportToDataUrl(format, quality / 100);
         const exportRes = await this.integrations.exportArtwork({
           dataUrl,
           shape: this.currentProject?.shape || 'LANDSCAPE',
           format,
-          quality: 90,
+          quality,
           title: this.currentProject?.name || ''
         });
 
-        // 2. Persist project document (JSON with canvas state and variations)
+        // 2. Persiste o projeto editável no disco
         if (this.currentProject) {
+          const titleInput = this.$('#artProjectTitle');
+          if (titleInput && titleInput.value.trim()) {
+            this.currentProject.name = titleInput.value.trim();
+          }
           this.currentProject.canvasDoc = this.canvas.toJSON();
           this.currentProject.thumbnail = exportRes.url;
           this.currentProject.updatedAt = new Date().toISOString();
 
-          // Sync active variation
           const activeVar = this.currentProject.variations?.find(v => v.id === this.currentProject.activeVariationId);
           if (activeVar) {
             activeVar.canvasDoc = this.currentProject.canvasDoc;
@@ -1682,23 +1916,157 @@
           await this.integrations.saveProject(this.currentProject);
         }
 
-        this.setSaved();
-
-        // 3. Apply to target folder or collection
+        // 3. Aplica na pasta/coleção e persiste workspace no Hub
         if (this.onSaveAndApply) {
           await this.onSaveAndApply({
             url: exportRes.url,
             shape: exportRes.shape,
             tileShape: exportRes.tileShape,
-            hideTitle: Boolean(this.currentProject?.hideTitle)
+            hideTitle: Boolean(this.currentProject?.hideTitle),
+            format: exportRes.format,
+            quality
           });
         }
+
+        // 4. Marca como salvo e fecha a janela de exportação
+        this.setSaved(true);
+        this.closeExportModal();
+
+        // 5. Exibe confirmação inequívoca com opções de continuar ou sair
+        const targetTitle = this.currentFolder?.title || this.currentGroup?.title || 'coleção';
+        this.showToast({
+          message: `✓ Capa salva no Hub e vinculada a "${targetTitle}" com sucesso!`,
+          type: 'success',
+          actions: [
+            {
+              label: 'Continuar Editando',
+              primary: false,
+              onClick: () => this.hideToast()
+            },
+            {
+              label: 'Voltar às Coleções',
+              primary: true,
+              onClick: () => this.onClose()
+            }
+          ],
+          duration: 9000
+        });
       } catch (err) {
-        alert(err.message || 'Falha ao salvar capa.');
+        this.setSaveStatus('error');
+        const errMsg = err.message || 'Falha ao salvar e vincular capa no Hub.';
+        this.showToast({
+          message: `Erro: ${errMsg}`,
+          type: 'error',
+          duration: 12000
+        });
+        const feedback = this.$('#artExportFeedback');
+        if (feedback) {
+          feedback.textContent = `Erro: ${errMsg}`;
+          feedback.className = 'artwork-export-feedback is-error';
+          feedback.hidden = false;
+        }
       } finally {
-        btn.disabled = false;
-        btn.textContent = '✦ Salvar e Aplicar';
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = originalText || '✦ Salvar e Aplicar';
+        }
+        if (modalBtn) {
+          modalBtn.disabled = false;
+          modalBtn.textContent = '✦ Salvar e Aplicar';
+        }
       }
+    }
+
+    async applyExported() {
+      const format = this.$('#artExportFormat')?.value || 'webp';
+      const quality = Number(this.$('#artExportQuality')?.value) || 90;
+      await this.handleSaveAndApply({ format, quality });
+    }
+
+    /* ---------------- Export Modal Controller ---------------- */
+
+    openExportModal() {
+      const modal = this.$('#artworkExportDialog');
+      if (!modal) return;
+      modal.hidden = false;
+
+      // Limpa feedbacks anteriores
+      const feedback = this.$('#artExportFeedback');
+      if (feedback) {
+        feedback.hidden = true;
+        feedback.textContent = '';
+      }
+
+      // Atualiza informações de destino da capa
+      const targetInfo = this.$('#artExportTargetInfo');
+      if (targetInfo) {
+        const destKind = this.currentProject?.target?.kind === 'group' ? 'Coleção' : 'Pasta';
+        const destTitle = this.currentFolder?.title || this.currentGroup?.title || this.currentProject?.name || '';
+        targetInfo.innerHTML = `<span>Destino da Capa:</span> <strong>${esc(destKind)}: ${esc(destTitle)}</strong>`;
+      }
+
+      this.updateExportModalPreview();
+    }
+
+    closeExportModal() {
+      const modal = this.$('#artworkExportDialog');
+      if (modal) modal.hidden = true;
+    }
+
+    updateExportModalPreview() {
+      const modal = this.$('#artworkExportDialog');
+      if (!modal || modal.hidden) return;
+
+      const format = String(this.$('#artExportFormat')?.value || 'webp').toLowerCase();
+      const quality = Number(this.$('#artExportQuality')?.value) || 90;
+      const qualityVal = this.$('#artExportQualityVal');
+      const qualityDesc = this.$('#artExportQualityDesc');
+      const badge = this.$('#artExportBadge');
+      const specs = this.$('#artExportSpecs');
+      const previewImg = this.$('#artExportPreviewImg');
+      const previewFrame = this.$('#artExportPreviewFrame');
+
+      if (qualityVal) qualityVal.textContent = `${quality}%`;
+
+      if (badge) {
+        badge.textContent = `${format.toUpperCase()} · ${quality}%`;
+      }
+
+      if (qualityDesc) {
+        if (format === 'webp') {
+          qualityDesc.textContent = quality >= 90
+            ? 'Alta fidelidade visual com excelente compressão para Nuvio e Stremio.'
+            : 'Carregamento ultrarrápido com baixo consumo de dados.';
+        } else if (format === 'png') {
+          qualityDesc.textContent = 'Formato sem perdas (lossless). Ideal para textos nítidos e logos transparentes.';
+        } else {
+          qualityDesc.textContent = 'Compatibilidade universal com players e navegadores legados.';
+        }
+      }
+
+      const spec = globalThis.ArtworkStudioModel.getShapeSpec(this.currentProject?.shape);
+      if (specs) {
+        specs.innerHTML = `
+          <div class="artwork-export-spec-item"><span>Dimensões:</span> <strong>${spec.width} × ${spec.height} px</strong></div>
+          <div class="artwork-export-spec-item"><span>Proporção:</span> <strong>${spec.ratio} (${spec.key})</strong></div>
+          <div class="artwork-export-spec-item"><span>Status:</span> <strong>Pronto para exportar</strong></div>
+        `;
+      }
+
+      if (previewFrame) {
+        previewFrame.style.aspectRatio = spec.ratio === '2:3' ? '2/3' : spec.ratio === '3:4' ? '3/4' : spec.ratio === '1:1' ? '1/1' : '16/9';
+      }
+
+      // Gera miniatura fiel a partir do canvas (com debounce)
+      clearTimeout(this.exportPreviewDebounce);
+      this.exportPreviewDebounce = setTimeout(() => {
+        try {
+          const thumbUrl = this.canvas.exportToDataUrl(format, Math.min(quality, 75) / 100);
+          if (previewImg) {
+            previewImg.src = thumbUrl;
+          }
+        } catch {}
+      }, 60);
     }
 
     /* ---------------- History (Undo / Redo) ---------------- */

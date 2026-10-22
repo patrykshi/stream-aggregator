@@ -122,6 +122,9 @@ try {
       if (msg.error) reject(Error(msg.error.message));
       else resolve(msg.result);
     }
+    if (msg.method === 'Page.javascriptDialogOpening') {
+      void send('Page.handleJavaScriptDialog', { accept: true }).catch(() => {});
+    }
     if (msg.method === 'Runtime.exceptionThrown') {
       const desc = msg.params.exceptionDetails?.exception?.description || msg.params.exceptionDetails?.text || 'Exception';
       errors.push(desc);
@@ -161,8 +164,11 @@ try {
   await click('[data-action=open-artwork-studio-v2][data-target=group]');
   await wait(() => ev("!document.getElementById('artworkStudioWorkspace')?.hidden"), 'Studio 2.0 Workspace open');
 
-  // 5. Verify Workspace components
+  // 5. Verify Workspace components and Topbar actions
   assert.equal(await ev("!!document.querySelector('.artwork-topbar')"), true, 'Topbar exists');
+  assert.equal(await ev("!!document.getElementById('artBtnSaveProject')"), true, 'Save Project button exists');
+  assert.equal(await ev("!!document.getElementById('artBtnSaveAndApply')"), true, 'Save and Apply button exists');
+  assert.equal(await ev("!!document.getElementById('artBtnExport')"), true, 'Export button exists');
   assert.equal(await ev("!!document.querySelector('.artwork-tool-rail')"), true, 'Left tool rail exists');
   assert.equal(await ev("!!document.querySelector('.artwork-tool-drawer')"), true, 'Tool drawer exists');
   assert.equal(await ev("!!document.querySelector('.artwork-right-sidebar')"), true, 'Right sidebar exists');
@@ -173,28 +179,97 @@ try {
   await sleep(150);
   assert.equal(await ev("document.querySelector('[data-art-shape=POSTER]').classList.contains('active')"), true, 'Poster active');
 
-  // 7. Test Nuvio Preview mode switch
+  // 7. Test Nuvio Preview mode switch & TV simulation sub-mode
   await click('#artBtnViewNuvio');
   await sleep(200);
   assert.equal(await ev("!document.getElementById('artworkNuvioSimView')?.hidden"), true, 'Nuvio simulation visible');
 
-  // 8. Test TV simulation sub-mode
   await click('[data-nuvio-sub=tv]');
   await sleep(250);
   assert.equal(await ev("!!document.querySelector('.nuvio-sim-tv-bezel')"), true, 'TV bezel rendered');
 
-  // 9. Return to Editor
   await click('#artBtnViewEditor');
   await sleep(150);
   assert.equal(await ev("document.getElementById('artworkNuvioSimView')?.hidden"), true, 'Editor view active');
 
-  // 10. Close Studio and confirm clean return
-  await click('#artBtnBack');
+  // 8. Scenario A: Test "Salvar Projeto" (Operation A)
+  await click('#artBtnSaveProject');
+  await sleep(300);
+  const savePillText = await ev("document.getElementById('artSaveStatusPill')?.textContent");
+  assert.ok(savePillText.includes('Salvo'), 'Save pill shows Salvo after saving project');
+  assert.equal(await ev("!document.getElementById('artworkStudioToast')?.hidden"), true, 'Success toast rendered');
+  assert.equal(await ev("!document.getElementById('artworkStudioWorkspace')?.hidden"), true, 'User remains in Studio after saving project');
+
+  // 9. Scenario B: Test "Exportar Imagem" & "Baixar Arquivo" (Operation B)
+  await click('#artBtnExport');
+  await sleep(200);
+  assert.equal(await ev("!document.getElementById('artworkExportDialog')?.hidden"), true, 'Export dialog visible');
+  assert.equal(await ev("document.getElementById('artExportFormat')?.value"), 'webp', 'WebP format default');
+  assert.equal(await ev("document.getElementById('artExportQuality')?.value"), '90', '90% quality default');
+  assert.equal(await ev("!!document.getElementById('artExportPreviewImg')?.getAttribute('src')"), true, 'Live preview image rendered');
+
+  await click('#artBtnDownloadImage');
+  await sleep(400);
+  assert.equal(await ev("!document.getElementById('artExportFeedback')?.hidden"), true, 'Download feedback displayed');
+  assert.equal(await ev("document.getElementById('artExportFeedback')?.textContent.includes('baixada')"), true, 'Download confirmation text verified');
+  assert.equal(await ev("!document.getElementById('artworkStudioWorkspace')?.hidden"), true, 'User remains in Studio after download');
+
+  await click('#artBtnCancelExport');
   await sleep(150);
-  assert.equal(await ev("document.getElementById('artworkStudioWorkspace')?.hidden"), true, 'Studio closed cleanly');
+  assert.equal(await ev("document.getElementById('artworkExportDialog')?.hidden"), true, 'Export modal closed via Cancel');
+
+  // 10. Scenario C: Test "Salvar e Aplicar" (Operation C)
+  await click('#artBtnSaveAndApply');
+  await sleep(500);
+  const applyPillText = await ev("document.getElementById('artSaveStatusPill')?.textContent");
+  assert.ok(applyPillText.includes('Salvo e Aplicado'), 'Pill shows Salvo e Aplicado');
+  assert.equal(await ev("!document.getElementById('artworkStudioToast')?.hidden"), true, 'Success toast displayed with options');
+
+  // Click "Voltar às Coleções" inside toast
+  const toastActionsExist = await ev("document.querySelectorAll('#artToastActions button').length >= 2");
+  assert.equal(toastActionsExist, true, 'Toast provides action buttons');
+
+  const backActionBtn = await ev("document.querySelectorAll('#artToastActions button')[1]?.textContent");
+  assert.ok(backActionBtn.includes('Coleções'), 'Toast second action button returns to collections');
+
+  await ev("document.querySelectorAll('#artToastActions button')[1]?.click()");
+  await sleep(250);
+  assert.equal(await ev("document.getElementById('artworkStudioWorkspace')?.hidden"), true, 'Studio closed via toast action');
+
+  // 11. Verify collections state updated and persisted without dirty prompt
+  const saveBtnDisabled = await ev("document.getElementById('saveButton')?.disabled");
+  assert.equal(saveBtnDisabled, true, 'Global save button is disabled (workspace persisted cleanly)');
+
+  const saveHint = await ev("document.getElementById('saveHint')?.textContent");
+  assert.equal(saveHint, '', 'No unsaved changes warning in global chrome');
+
+  const groupCoverUrl = await ev("document.getElementById('groupBackdrop')?.value || document.querySelector('.art-preview img')?.getAttribute('src')");
+  assert.ok(groupCoverUrl && groupCoverUrl.includes('/api/hub/artwork/studio/'), 'Cover URL updated on target collection');
+
+  // 12. Scenario: Re-open and verify dirty guard on modified project
+  await click('[data-action=open-artwork-studio-v2][data-target=group]');
+  await wait(() => ev("!document.getElementById('artworkStudioWorkspace')?.hidden"), 'Studio 2.0 re-opened');
+  await sleep(400);
+
+  // Type new title to trigger dirty state
+  await ev("(()=>{ const input = document.getElementById('artProjectTitle'); input.value = 'Descobrir Teste'; input.dispatchEvent(new Event('input', { bubbles: true })); })()");
+  await sleep(150);
+  const dirtyPillText = await ev("document.getElementById('artSaveStatusPill')?.textContent");
+  assert.ok(dirtyPillText.includes('Modificado'), 'Pill reflects dirty state');
+
+  // Save project cleanly
+  await click('#artBtnSaveProject');
+  await wait(() => ev("document.getElementById('artSaveStatusPill')?.textContent.includes('Salvo') && !document.getElementById('artBtnSaveProject')?.disabled"), 'Save project complete');
+  const cleanPillText = await ev("document.getElementById('artSaveStatusPill')?.textContent");
+  assert.ok(cleanPillText.includes('Salvo'), 'Pill reflects clean saved state');
+
+  // Close cleanly
+  await click('#artBtnBack');
+  await sleep(200);
+  assert.equal(await ev("document.getElementById('artworkStudioWorkspace')?.hidden"), true, 'Studio closed cleanly without beforeunload prompt');
 
   assert.deepEqual(errors, [], 'No browser runtime errors');
-  console.log(JSON.stringify({ success: true, studioVersion: '2.0', testCount: 10, errors: 0 }));
+  console.log(JSON.stringify({ success: true, studioVersion: '2.0', testCount: 12, errors: 0 }));
 } finally {
   try { ws?.close(); } catch {}
   try { chrome?.kill('SIGTERM'); } catch {}
