@@ -35,8 +35,8 @@ export const STUDIO_PRESETS = Object.freeze([
   { id: 'kids', category: 'genre', name: 'Infantil & Família', label: 'INFANTIL', primary: '#0EA5E9', secondary: '#061826', accent: '#7DD3FC', badge: '★', subtitle: 'ANIMAÇÃO & AVENTURA' },
   { id: 'action', category: 'genre', name: 'Ação & Aventura', label: 'AÇÃO', primary: '#EA580C', secondary: '#1A0B04', accent: '#FDBA74', badge: '⚡', subtitle: 'ADRENALINA & BLOCKBUSTERS' },
   { id: 'classics', category: 'genre', name: 'Clássicos & Cult', label: 'CLÁSSICOS', primary: '#B45309', secondary: '#170E05', accent: '#FCD34D', badge: '♛', subtitle: 'OBRAS-PRIMAS DO CINEMA' },
-  { id: 'uhd4k', category: 'genre', name: '4K Ultra HD', label: '4K UHD', primary: '#6366F1', secondary: '#08091E', accent: '#A5B4FC', badge: '4K', subtitle: 'HDR10+ · DOLBY VISION' }
-]);
+  { id: 'uhd4k', category: 'genre', name: '4K Ultra HD', label: '4K UHD', primary: '#6366F1', secondary: '#08091E', accent: '#A5B4FC', badge: '', subtitle: 'HDR10+ · DOLBY VISION' }
+].map(p => Object.freeze({...p,badge:''})));
 
 const CURATED_TMDB_SAMPLES = Object.freeze([
   { id: 'tt15239678', name: 'Duna: Parte Dois', year: 2024, type: 'movie', poster: 'https://image.tmdb.org/t/p/w780/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg', backdrop: 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg' },
@@ -175,7 +175,7 @@ export async function saveDataUrlArtwork(dataUrl, options = {}) {
   return saveStudioArtworkBuffer(buffer, normalizedOpts);
 }
 
-async function fetchRemoteImageBuffer(rawUrl, { fetchImpl = globalThis.fetch } = {}) {
+export async function fetchRemoteImageBuffer(rawUrl, { fetchImpl = globalThis.fetch } = {}) {
   if (typeof rawUrl !== 'string' || !rawUrl.trim()) return null;
   if (isLocalStudioArtworkUrl(rawUrl)) {
     const fname = extractStudioArtworkFilename(rawUrl);
@@ -199,7 +199,7 @@ async function fetchRemoteImageBuffer(rawUrl, { fetchImpl = globalThis.fetch } =
         'User-Agent': 'NuvioHub/1.0'
       },
       signal: AbortSignal.timeout(10000),
-      redirect: 'follow'
+      redirect: 'error'
     });
     if (!res.ok) return null;
     const arr = await res.arrayBuffer();
@@ -330,6 +330,21 @@ function buildOverlaySvg({
   </svg>`;
 }
 
+export async function applyUploadedMark(base, logoDataUrl, width, height) {
+  if(!logoDataUrl)return base;
+  if(typeof logoDataUrl!=='string'||logoDataUrl.length>2_800_000 ||
+     !/^data:image\/(png|webp|jpeg);base64,[a-zA-Z0-9+/=]+$/.test(logoDataUrl))
+    throw Error('Envie um logo ou ícone PNG/WebP/JPEG de até 2 MB. SVG remoto não é permitido.');
+  const input=Buffer.from(logoDataUrl.split(',')[1],'base64');
+  if(input.length>2_000_000)throw Error('Logo excedeu o limite de 2 MB.');
+  const mark=await sharp(input,{limitInputPixels:3_000_000,animated:false})
+    .resize(Math.min(460,Math.round(width*.46)),Math.min(260,Math.round(height*.30)),
+      {fit:'inside',withoutEnlargement:true}).png().toBuffer();
+  const info=await sharp(mark).metadata();
+  const x=Math.floor((width-info.width)/2), y=Math.floor(height*.18);
+  return sharp(base).composite([{input:mark,left:x,top:y}]).webp({quality:88}).toBuffer();
+}
+
 export async function composeStudioArtwork({
   mode = 'mosaic',
   shape = 'LANDSCAPE',
@@ -343,6 +358,7 @@ export async function composeStudioArtwork({
   accent = '#FF5A5F',
   hideTitle = false,
   pattern = 'glow',
+  logoDataUrl = '',
   images = [],
   save = false,
   fetchImpl = globalThis.fetch
@@ -354,9 +370,9 @@ export async function composeStudioArtwork({
   const effectivePrimary = preset ? (primary || preset.primary) : primary;
   const effectiveSecondary = preset ? (secondary || preset.secondary) : secondary;
   const effectiveAccent = preset ? (accent || preset.accent) : accent;
-  const effectiveBadge = badge !== undefined && badge !== '' ? badge : (preset?.badge || '');
+  const effectiveBadge = typeof badge === 'string' ? badge : ''; // Nunca falsificar logos comerciais.
   const effectiveTitle = title !== undefined ? title : (preset?.label || 'COLEÇÃO');
-  const effectiveSub = subtitle !== undefined && subtitle !== '' ? subtitle : (preset?.subtitle || '');
+  const effectiveSub = typeof subtitle === 'string' ? subtitle : '';
 
   let baseCanvas;
 
@@ -464,6 +480,7 @@ export async function composeStudioArtwork({
       .toBuffer();
   }
 
+  baseCanvas=await applyUploadedMark(baseCanvas,logoDataUrl,width,height);
   const dataUrl = `data:image/webp;base64,${baseCanvas.toString('base64')}`;
   if (!save) {
     return {
@@ -504,82 +521,59 @@ export async function generateAiStudioArtwork({
   style = 'cinema',
   shape = 'LANDSCAPE',
   hideTitle = false,
+  logoDataUrl = '',
   images = [],
   save = true,
   fetchImpl = globalThis.fetch
 } = {}) {
   const spec = getStudioShapeSpec(shape);
   const styleSpec = AI_STYLE_PALETTES[style] || AI_STYLE_PALETTES.cinema;
-  const geminiKey = String(process.env.GEMINI_API_KEY || '').trim();
-
-  if (geminiKey) {
-    try {
-      const ratioHint = spec.ratio === '2:3' ? 'vertical 2:3 movie poster' : spec.ratio === '3:4' ? 'vertical 3:4 portrait cover' : spec.ratio === '1:1' ? 'square 1:1 emblem icon' : 'widescreen 16:9 cinematic backdrop';
-      const fullPrompt = `Create a high-resolution ${ratioHint} artwork for a streaming media collection titled "${title || prompt}". Style: ${style}. Theme description: ${prompt || title}. Rich atmospheric lighting, dark cinema palette, no watermarks, no UI frames.`;
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(geminiKey)}`;
-      const res = await fetchImpl(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'aistudio-build' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
-        }),
-        signal: AbortSignal.timeout(20000)
-      });
-      if (res.ok) {
-        const payload = await res.json();
-        const parts = payload?.candidates?.[0]?.content?.parts || [];
-        const imgPart = parts.find(p => p?.inlineData?.data);
-        if (imgPart?.inlineData?.data) {
-          const rawBuf = Buffer.from(imgPart.inlineData.data, 'base64');
-          const overlaySvg = buildOverlaySvg({
-            width: spec.width,
-            height: spec.height,
-            title: title || '',
-            subtitle: subtitle || '',
-            badge: badge || '',
-            primary: styleSpec.primary,
-            secondary: styleSpec.secondary,
-            accent: styleSpec.accent,
-            hideTitle: Boolean(hideTitle),
-            mode: 'mosaic',
-            pattern: styleSpec.pattern
-          });
-          const composed = await sharp(rawBuf, { limitInputPixels: 45_000_000, animated: false })
-            .resize(spec.width, spec.height, { fit: 'cover', position: 'centre' })
-            .composite([{ input: Buffer.from(overlaySvg), left: 0, top: 0 }])
-            .webp({ quality: 88, effort: 4 })
-            .toBuffer();
-          const dataUrl = `data:image/webp;base64,${composed.toString('base64')}`;
-          if (!save) {
-            return { ok: true, provider: 'gemini', shape: spec.key, tileShape: spec.tileShape, width: spec.width, height: spec.height, dataUrl };
-          }
-          const saved = await saveStudioArtworkBuffer(composed, { shape: spec.key, title, mode: 'ai-gemini' });
-          return { ok: true, provider: 'gemini', ...saved, dataUrl };
-        }
-      }
-    } catch {
-      // Fallback transparently to procedural + TMDB hybrid generator below
-    }
+  const geminiKey = getIntegrationKey('gemini');
+  if(!geminiKey){
+    const error=Error('Gemini não configurado. Adicione uma chave Gemini em Configurações → Integrações antes de gerar arte com IA.');
+    error.status=503;throw error;
   }
-
-  // Hybrid AI-Style Procedural + TMDB Backdrop Composition
-  return composeStudioArtwork({
-    mode: images?.length ? 'mosaic' : 'ai',
-    shape: spec.key,
-    layout: images?.length >= 3 ? 'triptych' : 'single',
-    title: title || prompt.slice(0, 28) || 'COLEÇÃO',
-    subtitle: subtitle || (prompt ? prompt.slice(0, 48) : 'ARTE EXCLUSIVA DO HUB'),
-    badge: badge || '✦',
-    primary: styleSpec.primary,
-    secondary: styleSpec.secondary,
-    accent: styleSpec.accent,
-    hideTitle: Boolean(hideTitle),
-    pattern: styleSpec.pattern,
-    images,
-    save,
-    fetchImpl
-  });
+  const ratioHint = spec.ratio === '2:3' ? 'vertical 2:3 movie poster' :
+    spec.ratio === '3:4' ? 'vertical 3:4 portrait cover' :
+    spec.ratio === '1:1' ? 'square 1:1 emblem icon' : 'widescreen 16:9 cinematic backdrop';
+  const fullPrompt = `Create high resolution ${ratioHint} background art for a personal movie/TV collection. Theme: ${String(prompt||title).slice(0,900)}. Style: ${style}. Rich cinematic lighting, no text, no brand logos, no watermarks, no UI frames.`;
+  // Nunca coloque a chave em URL/log ou no navegador.
+  const apiUrl='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent';
+  let res;
+  try{res=await fetchImpl(apiUrl,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-goog-api-key':geminiKey},
+    body:JSON.stringify({contents:[{parts:[{text:fullPrompt}]}],
+      generationConfig:{responseModalities:['TEXT','IMAGE'],imageConfig:{aspectRatio:spec.ratio}}}),
+    signal:AbortSignal.timeout(60000),redirect:'error'
+  });}catch{throw Object.assign(Error('Gemini não respondeu. Verifique a conexão e tente novamente.'),{status:502});}
+  if(!res.ok){
+    const error=Error(res.status===429?'Limite de geração Gemini atingido. Tente mais tarde.':
+     res.status===403||res.status===401?'Chave Gemini não autorizada. Verifique a chave em Configurações.':
+     `Gemini retornou HTTP ${res.status}.`);
+    error.status=res.status===429?429:502;throw error;
+  }
+  const payload=await res.json();
+  const parts=payload?.candidates?.[0]?.content?.parts||[];
+  const imgPart=parts.find(p=>p?.inlineData?.data && /^image\/(png|jpeg|webp)$/.test(p.inlineData?.mimeType||''));
+  if(!imgPart){
+    throw Object.assign(Error('O Gemini não retornou uma imagem. Revise o prompt ou tente novamente.'),{status:502});
+  }
+  if(imgPart.inlineData.data.length>15_000_000)throw Error('Imagem Gemini acima do limite permitido.');
+  const rawBuf=Buffer.from(imgPart.inlineData.data,'base64');
+  const overlaySvg=buildOverlaySvg({width:spec.width,height:spec.height,
+    title,subtitle,badge,primary:styleSpec.primary,secondary:styleSpec.secondary,
+    accent:styleSpec.accent,hideTitle:Boolean(hideTitle),mode:'mosaic',pattern:styleSpec.pattern});
+  let composed=await sharp(rawBuf,{limitInputPixels:45_000_000,animated:false})
+    .resize(spec.width,spec.height,{fit:'cover',position:'centre'})
+    .composite([{input:Buffer.from(overlaySvg),left:0,top:0}])
+    .webp({quality:88,effort:4}).toBuffer();
+  composed=await applyUploadedMark(composed,logoDataUrl,spec.width,spec.height);
+  const dataUrl=`data:image/webp;base64,${composed.toString('base64')}`;
+  if(!save)return {ok:true,provider:'gemini',shape:spec.key,tileShape:spec.tileShape,
+    width:spec.width,height:spec.height,dataUrl};
+  const saved=await saveStudioArtworkBuffer(composed,{shape:spec.key,title,mode:'ai-gemini'});
+  return {ok:true,provider:'gemini',...saved,dataUrl};
 }
 
 export async function searchTmdbArtworkCandidates({

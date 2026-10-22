@@ -578,7 +578,8 @@ function renderSettings(){
   {id:'trakt',title:'Trakt',info:'Client ID de uma aplicação Trakt para importar listas públicas; não é a senha da conta.',
    help:'https://trakt.tv/oauth/applications'},
   {id:'mdblist',title:'MDBList',info:'Opcional para a API de listas. Feeds JSON públicos podem funcionar sem chave.',
-   help:'https://mdblist.com/preferences/'}
+   help:'https://mdblist.com/preferences/'},
+  {id:'gemini',title:'Gemini · Geração de imagens',info:'IA real para capas. Requer uma chave Gemini com acesso à geração de imagens; pode haver cobrança por uso.',help:'https://aistudio.google.com/apikey'}
  ];
  const integrations=names.map(x=>{
   const entry=s.integrations?.[x.id]||{};
@@ -2663,6 +2664,12 @@ async function openArtworkStudio(targetKind='folder'){
   targetKind:isGroup?'group':'folder',
   targetId:targetObj.id,
   mode:'mosaic',
+  markMode:'none',
+  uploadedMark:'',
+  aiImageDataUrl:'',
+  pythonColor:'#d4ab54',
+  pythonFontSize:95,
+  pythonDivider:true,
   shape:initialShape,
   tileShape:initialTileShape,
   ratio:TILE_SHAPE_TO_RATIO[initialTileShape]||'16:9',
@@ -2684,6 +2691,8 @@ async function openArtworkStudio(targetKind='folder'){
   selectedImages:[],
   previewDataUrl:'',
   savedResult:null,
+  aiBusy:false,
+  previewSerial:0,
   busy:false
  };
 
@@ -2693,7 +2702,7 @@ async function openArtworkStudio(targetKind='folder'){
   studioState.primary=matchedPreset.primary;
   studioState.secondary=matchedPreset.secondary;
   studioState.accent=matchedPreset.accent;
-  studioState.badge=matchedPreset.badge;
+  // As cores do streaming são apenas tema: nunca representar siglas como logos oficiais.
  }
 
  const shapeOptions=[
@@ -2704,6 +2713,17 @@ async function openArtworkStudio(targetKind='folder'){
   {shape:'BACKDROP',tileShape:'LANDSCAPE',ratio:'16:9 HD',label:'Backdrop Coleção · 16:9 HD (1920×1080)'}
  ];
  const currentShapeOption=shapeOptions.find(o=>o.shape===studioState.shape)||shapeOptions[0];
+ const commonArtworkPayload=()=>({
+   mode:studioState.mode,shape:studioState.shape,layout:studioState.layout,
+   title:studioState.title,subtitle:studioState.subtitle,
+   badge:studioState.markMode==='text'?studioState.badge:'',
+   logoDataUrl:['upload','draw'].includes(studioState.markMode)?studioState.uploadedMark:'',
+   presetId:studioState.presetId,primary:studioState.primary,
+   secondary:studioState.secondary,accent:studioState.accent,
+   hideTitle:studioState.hideTitle,pattern:studioState.pattern,
+   images:studioState.selectedImages,save:false
+ });
+
 
  showModal(
   `Estúdio de Capas e Ícones · ${isGroup?'Coleção: '+g.title:'Pasta: '+f.title}`,
@@ -2711,8 +2731,9 @@ async function openArtworkStudio(targetKind='folder'){
    <div class="artwork-studio-top-bar">
     <div class="artwork-studio-modes" role="tablist" aria-label="Modo de criação">
      <button type="button" class="artwork-mode-tab active" data-art-mode="mosaic">1. Mosaico & Arte TMDB</button>
-     <button type="button" class="artwork-mode-tab" data-art-mode="preset">2. Logos & Temas Prontos</button>
-     <button type="button" class="artwork-mode-tab" data-art-mode="ai">3. Gerar com IA</button>
+     <button type="button" class="artwork-mode-tab" data-art-mode="preset">2. Temas e cores (sem logo falso)</button>
+     <button type="button" class="artwork-mode-tab" data-art-mode="ai">3. IA Gemini</button>
+     <button type="button" class="artwork-mode-tab" data-art-mode="python">4. Criador Python do PC</button>
     </div>
     <div class="artwork-studio-shape-bar" role="group" aria-label="Proporção e tamanho da capa">
      ${shapeOptions.map(opt=>`<button type="button" class="artwork-shape-pill ${studioState.shape===opt.shape?'active':''}" data-art-shape="${opt.shape}" data-tile-shape="${opt.tileShape}" data-art-ratio="${opt.ratio}" aria-pressed="${studioState.shape===opt.shape}">${esc(opt.label)}</button>`).join('')}
@@ -2747,10 +2768,10 @@ async function openArtworkStudio(targetKind='folder'){
      </div>
 
      <div id="artPanePreset" class="artwork-pane" hidden>
-      <p class="muted" style="margin:0 0 8px">Escolha um tema oficial de streaming ou gênero cinematográfico (adapta-se automaticamente a 16:9, 2:3, 3:4 e 1:1):</p>
+      <p class="muted" style="margin:0 0 8px">Temas inspirados nas cores dos serviços. Não exibimos logos falsos nem simulamos marcas. Para usar o logo verdadeiro, importe a imagem original em PNG/WebP na área de marca abaixo.</p>
       <div class="artwork-presets-grid">
        ${presets.map(p=>`<button type="button" class="artwork-preset-card ${studioState.presetId===p.id?'active':''}" data-art-preset="${esc(p.id)}" style="--preset-color:${esc(p.primary)}">
-        <span class="artwork-preset-badge" style="background:${esc(p.primary)}">${esc(p.badge)}</span>
+        <span class="artwork-preset-badge" style="background:${esc(p.primary)}" aria-hidden="true"></span>
         <span><strong>${esc(p.name)}</strong><small>${esc(p.category==='streaming'?'Streaming':'Gênero / Tema')}</small></span>
        </button>`).join('')}
       </div>
@@ -2787,14 +2808,44 @@ async function openArtworkStudio(targetKind='folder'){
         <button type="button" class="btn btn-primary" id="artGenerateAiBtn">✦ Gerar Arte com IA</button>
        </div>
       </div>
-      <p class="muted" style="margin-top:8px">A IA gera a arte já na proporção selecionada acima (16:9, 2:3, 3:4 ou 1:1) e aplica a tipografia da coleção/pasta.</p>
+      <p class="muted" style="margin-top:8px">IA real via Gemini · ${presetsData.ai?.configured?'Chave conectada. A geração utiliza sua API e pode ter custo.':'Não configurada. Acesse Configurações → Integrações → Gemini e salve sua chave.'} A geração só ocorre ao clicar em Gerar, nunca automaticamente.</p>
+     </div>
+
+     <div id="artPanePython" class="artwork-pane" hidden>
+      <p class="muted">Utiliza o renderizador Pillow encontrado em <code>Projetos/Midia/TMDB/tmdb-capas/render.py</code>, montado em modo leitura. O layout original de capa dourada é preservado.</p>
+      <div class="artwork-inline-options">
+       <label class="field"><span>Cor da tipografia</span><input type="color" id="artPythonColor" value="#d4ab54"></label>
+       <label class="field"><span>Tamanho do título</span><input type="number" id="artPythonFont" min="24" max="180" value="95"></label>
+       <label class="settings-check"><input id="artPythonDivider" type="checkbox" checked>Divisor dourado</label>
+      </div>
+      <p class="muted">${presetsData.python?.configured?'Motor Python conectado.':'Motor Python indisponível neste ambiente.'} Usa a primeira imagem escolhida no TMDB como fundo. Não insere ícones de outras fontes.</p>
      </div>
 
      <div class="artwork-typography-box">
       <div class="artwork-inline-options">
        <label class="field"><span>Título exibido na capa</span><input id="artTitleInput" class="search" value="${esc(studioState.title)}" placeholder="Ex.: NETFLIX"></label>
        <label class="field"><span>Subtítulo / Selo superior</span><input id="artSubtitleInput" class="search" value="${esc(studioState.subtitle)}" placeholder="Ex.: ORIGINAIS & CATÁLOGO"></label>
-       <label class="field"><span>Ícone / Sigla central</span><input id="artBadgeInput" class="search" value="${esc(studioState.badge)}" placeholder="Ex.: N, 4K, ✦"></label>
+      </div>
+      <div class="artwork-mark-editor">
+       <label class="field"><span>Logo / Ícone da capa</span>
+        <select id="artMarkMode">
+         <option value="none" selected>Sem logo nem ícone</option>
+         <option value="text">Criar ícone por teclado (texto, sigla, símbolos)</option>
+         <option value="upload">Usar logo original em PNG/WebP enviado por mim</option>
+         <option value="draw">Desenhar meu próprio ícone</option>
+        </select>
+       </label>
+       <div id="artMarkTextBox" hidden>
+        <label class="field"><span>Digite seu símbolo ou monograma</span><input id="artBadgeInput" class="search" maxlength="8" value="" placeholder="Ex.: 4K, ★, BL, ♪"></label>
+        <div class="artwork-glyphs" aria-label="Inserir um símbolo no ícone">
+         ${['★','✦','◆','◈','●','▣','♥','♪','4K','BL'].map(glyph=>`<button type="button" data-art-glyph="${esc(glyph)}">${esc(glyph)}</button>`).join('')}
+        </div>
+       </div>
+       <div id="artMarkUploadBox" hidden><label class="field"><span>Selecionar logo original</span><input id="artLogoUpload" type="file" accept="image/png,image/webp,image/jpeg"></label><small>Não serão gerados logos falsos. Use apenas arquivos que você tem direito de utilizar (máximo 2 MB).</small></div>
+       <div id="artMarkDrawBox" hidden><p class="muted">Desenhe um símbolo original com o mouse ou toque:</p>
+        <canvas id="artIconCanvas" width="360" height="170" aria-label="Área para desenhar ícone" class="artwork-icon-canvas"></canvas>
+        <button type="button" id="artClearDraw" class="btn btn-subtle btn-small">Limpar desenho</button>
+       </div>
       </div>
       <label class="addon-resource-choice" style="margin-top:8px">
        <input type="checkbox" id="artHideTitleCheck" ${studioState.hideTitle?'checked':''}>
@@ -2822,40 +2873,17 @@ async function openArtworkStudio(targetKind='folder'){
    let finalSaved=studioState.savedResult;
    if(!finalSaved){
     if(studioState.mode==='ai'){
-     finalSaved=await request('/api/hub/artwork/generate-ai',{
-      method:'POST',
-      body:JSON.stringify({
-       prompt:studioState.aiPrompt,
-       title:studioState.title,
-       subtitle:studioState.subtitle,
-       badge:studioState.badge,
-       style:studioState.aiStyle,
-       shape:studioState.shape,
-       hideTitle:studioState.hideTitle,
-       images:studioState.selectedImages,
-       save:true
-      })
-     });
+     if(!studioState.aiImageDataUrl)throw Error('Clique em Gerar com IA para criar a arte real antes de salvar.');
+     finalSaved=await request('/api/hub/artwork/save',{method:'POST',
+       body:JSON.stringify({dataUrl:studioState.aiImageDataUrl,shape:studioState.shape,
+         title:studioState.title,mode:'ai-gemini'})});
     }else{
-     finalSaved=await request('/api/hub/artwork/compose',{
-      method:'POST',
-      body:JSON.stringify({
-       mode:studioState.mode,
-       shape:studioState.shape,
-       layout:studioState.layout,
-       title:studioState.title,
-       subtitle:studioState.subtitle,
-       badge:studioState.badge,
-       presetId:studioState.presetId,
-       primary:studioState.primary,
-       secondary:studioState.secondary,
-       accent:studioState.accent,
-       hideTitle:studioState.hideTitle,
-       pattern:studioState.pattern,
-       images:studioState.selectedImages,
-       save:true
-      })
-     });
+     const endpoint=studioState.mode==='python'?'/api/hub/artwork/python-compose':'/api/hub/artwork/compose';
+     finalSaved=await request(endpoint,{method:'POST',body:JSON.stringify({
+       ...commonArtworkPayload(),
+       titleColor:studioState.pythonColor,fontSize:studioState.pythonFontSize,
+       showDivider:studioState.pythonDivider,save:true
+     })});
     }
    }
    if(!finalSaved?.url)throw Error('Não foi possível salvar a capa gerada.');
@@ -2903,50 +2931,50 @@ async function openArtworkStudio(targetKind='folder'){
  };
 
  const refreshComposePreview=async({isAi=false}={})=>{
+  if(isAi&&studioState.aiBusy)return;
+  const serial=++studioState.previewSerial;
+  if(isAi)studioState.aiBusy=true;
+  const generateBtn=$('artGenerateAiBtn');
+  if(generateBtn)generateBtn.disabled=studioState.aiBusy;
   studioState.savedResult=null;
   updateShapeStageClass();
   const imgEl=$('artPreviewImage');
   const placeholder=$('artPreviewPlaceholder');
   const statusEl=$('artStudioStatus');
-  if(placeholder){placeholder.hidden=false;placeholder.textContent=isAi?'Gerando arte com IA...':'Renderizando capa em alta definição...';}
+  if(studioState.mode==='ai'&&!isAi){
+    studioState.aiImageDataUrl='';
+    if(imgEl){imgEl.hidden=true;imgEl.removeAttribute('src');}
+    if(placeholder){placeholder.hidden=false;placeholder.textContent=presetsData.ai?.configured?
+      'Clique em Gerar Arte com IA para solicitar uma nova imagem ao Gemini.':
+      'Conecte uma chave Gemini em Configurações → Integrações.';}
+    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-neutral','A geração por IA só ocorre mediante clique explícito.');
+    return;
+  }
+  if(placeholder){placeholder.hidden=false;placeholder.textContent=isAi?'Solicitando imagem real ao Gemini...':'Compondo prévia...';}
+  const endpoint=isAi?'/api/hub/artwork/generate-ai':
+    studioState.mode==='python'?'/api/hub/artwork/python-compose':'/api/hub/artwork/compose';
   try{
-   const endpoint=isAi?'/api/hub/artwork/generate-ai':'/api/hub/artwork/compose';
-   const payload=isAi?{
-    prompt:studioState.aiPrompt,
-    title:studioState.title,
-    subtitle:studioState.subtitle,
-    badge:studioState.badge,
-    style:studioState.aiStyle,
-    shape:studioState.shape,
-    hideTitle:studioState.hideTitle,
-    images:studioState.selectedImages,
-    save:false
-   }:{
-    mode:studioState.mode,
-    shape:studioState.shape,
-    layout:studioState.layout,
-    title:studioState.title,
-    subtitle:studioState.subtitle,
-    badge:studioState.badge,
-    presetId:studioState.presetId,
-    primary:studioState.primary,
-    secondary:studioState.secondary,
-    accent:studioState.accent,
-    hideTitle:studioState.hideTitle,
-    pattern:studioState.pattern,
-    images:studioState.selectedImages,
-    save:false
-   };
-   const res=await request(endpoint,{method:'POST',body:JSON.stringify(payload)});
+   const res=await request(endpoint,{method:'POST',body:JSON.stringify({
+     ...commonArtworkPayload(),prompt:studioState.aiPrompt,style:studioState.aiStyle,
+     titleColor:studioState.pythonColor,fontSize:studioState.pythonFontSize,
+     showDivider:studioState.pythonDivider,save:false
+   })});
+   if(serial!==studioState.previewSerial)return;
    if(res?.dataUrl&&imgEl){
-    imgEl.src=res.dataUrl;
-    imgEl.hidden=false;
+    imgEl.src=res.dataUrl;imgEl.hidden=false;
+    if(isAi)studioState.aiImageDataUrl=res.dataUrl;
     if(placeholder)placeholder.hidden=true;
-    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-valid',`Prévia pronta em ${res.width}×${res.height}px (${res.shape}). Clique em Salvar e aplicar para vincular.`);
+    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-valid',
+      `Prévia ${res.provider||'local'} pronta em ${res.width}×${res.height}px. Salve e aplique para vincular.`);
    }
   }catch(err){
-   if(placeholder){placeholder.hidden=false;placeholder.textContent='Erro ao renderizar prévia.';}
+   if(serial!==studioState.previewSerial)return;
+   if(imgEl)imgEl.hidden=true;
+   if(placeholder){placeholder.hidden=false;placeholder.textContent=err.message||'Erro ao renderizar prévia.';}
    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-error',err.message||'Falha ao compor prévia.');
+  }finally{
+   if(isAi)studioState.aiBusy=false;
+   if(generateBtn)generateBtn.disabled=studioState.aiBusy;
   }
  };
 
@@ -2993,6 +3021,32 @@ async function openArtworkStudio(targetKind='folder'){
   }
  };
 
+ const updateMarkControls=()=>{
+  if($('artMarkTextBox'))$('artMarkTextBox').hidden=studioState.markMode!=='text';
+  if($('artMarkUploadBox'))$('artMarkUploadBox').hidden=studioState.markMode!=='upload';
+  if($('artMarkDrawBox'))$('artMarkDrawBox').hidden=studioState.markMode!=='draw';
+ };
+ const iconCanvas=$('artIconCanvas');
+ if(iconCanvas){
+  const ctx2d=iconCanvas.getContext('2d');
+  let drawing=false;
+  const point=e=>{const r=iconCanvas.getBoundingClientRect();return {
+    x:(e.clientX-r.left)*(iconCanvas.width/r.width),
+    y:(e.clientY-r.top)*(iconCanvas.height/r.height)};};
+  iconCanvas.addEventListener('pointerdown',e=>{
+    drawing=true;iconCanvas.setPointerCapture(e.pointerId);
+    const p=point(e);ctx2d.beginPath();ctx2d.moveTo(p.x,p.y);
+    ctx2d.strokeStyle='#ffffff';ctx2d.lineWidth=9;ctx2d.lineCap='round';ctx2d.lineJoin='round';
+  });
+  iconCanvas.addEventListener('pointermove',e=>{if(!drawing)return;const p=point(e);ctx2d.lineTo(p.x,p.y);ctx2d.stroke();});
+  iconCanvas.addEventListener('pointerup',()=>{
+    drawing=false;studioState.uploadedMark=iconCanvas.toDataURL('image/png');
+    void refreshComposePreview();
+  });
+  $('artClearDraw')?.addEventListener('click',()=>{
+    ctx2d.clearRect(0,0,iconCanvas.width,iconCanvas.height);studioState.uploadedMark='';void refreshComposePreview();
+  });
+ }
  const modalRoot=$('modalContent');
  modalRoot.addEventListener('click',e=>{
   const modeBtn=e.target.closest('[data-art-mode]');
@@ -3002,7 +3056,8 @@ async function openArtworkStudio(targetKind='folder'){
    $('artPaneMosaic').hidden=studioState.mode!=='mosaic';
    $('artPanePreset').hidden=studioState.mode!=='preset';
    $('artPaneAi').hidden=studioState.mode!=='ai';
-   void refreshComposePreview({isAi:studioState.mode==='ai'});
+   $('artPanePython').hidden=studioState.mode!=='python';
+   void refreshComposePreview();
    return;
   }
   const shapeBtn=e.target.closest('[data-art-shape],[data-art-ratio]');
@@ -3027,7 +3082,7 @@ async function openArtworkStudio(targetKind='folder'){
     b.setAttribute('aria-pressed',String(isSelected));
    });
    updateShapeStageClass();
-   void refreshComposePreview({isAi:studioState.mode==='ai'});
+   void refreshComposePreview();
    return;
   }
   const presetBtn=e.target.closest('[data-art-preset]');
@@ -3038,11 +3093,12 @@ async function openArtworkStudio(targetKind='folder'){
    studioState.primary=p.primary;
    studioState.secondary=p.secondary;
    studioState.accent=p.accent;
-   studioState.badge=p.badge;
+   // Não atribuir siglas falsas ao badge. A marca é gerida pelo usuário.
    if($('artColorPrimary'))$('artColorPrimary').value=p.primary;
    if($('artColorAccent'))$('artColorAccent').value=p.accent;
-   if($('artBadgeInput'))$('artBadgeInput').value=p.badge;
-   if($('artSubtitleInput'))$('artSubtitleInput').value=p.subtitle;
+
+   studioState.subtitle=p.subtitle||'';
+   if($('artSubtitleInput'))$('artSubtitleInput').value=studioState.subtitle;
    modalRoot.querySelectorAll('[data-art-preset]').forEach(b=>b.classList.toggle('active',b===presetBtn));
    void refreshComposePreview({isAi:false});
    return;
@@ -3062,6 +3118,11 @@ async function openArtworkStudio(targetKind='folder'){
    renderTmdbCandidatesGrid();
    void refreshComposePreview({isAi:false});
    return;
+  }
+  const glyphButton=e.target.closest('[data-art-glyph]');
+  if(glyphButton){studioState.badge=glyphButton.dataset.artGlyph;
+   if($('artBadgeInput'))$('artBadgeInput').value=studioState.badge;
+   void refreshComposePreview();return;
   }
   if(e.target.id==='artTmdbSearchBtn'){
    void loadTmdbCandidates($('artTmdbSearch')?.value||'');
@@ -3085,8 +3146,27 @@ async function openArtworkStudio(targetKind='folder'){
   }else if(id==='artColorPrimary'){studioState.primary=e.target.value;scheduleCompose();}
   else if(id==='artColorAccent'){studioState.accent=e.target.value;scheduleCompose();}
   else if(id==='artPattern'){studioState.pattern=e.target.value;void refreshComposePreview();}
-  else if(id==='artAiStyle'){studioState.aiStyle=e.target.value;void refreshComposePreview({isAi:true});}
-  else if(id==='artHideTitleCheck'){studioState.hideTitle=e.target.checked;void refreshComposePreview({isAi:studioState.mode==='ai'});}
+  else if(id==='artMarkMode'){
+   studioState.markMode=e.target.value;studioState.uploadedMark='';
+   updateMarkControls();void refreshComposePreview();
+  }else if(id==='artLogoUpload'){
+   const file=e.target.files?.[0];
+   if(!file)return;
+   if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2_000_000){
+     notify('Use uma imagem PNG, WebP ou JPEG até 2 MB.');return;
+   }
+   const reader=new FileReader();reader.onload=()=>{
+     studioState.uploadedMark=String(reader.result||'');void refreshComposePreview();
+   };reader.readAsDataURL(file);
+  }else if(id==='artPythonColor'){
+   studioState.pythonColor=e.target.value;void refreshComposePreview();
+  }else if(id==='artPythonFont'){
+   studioState.pythonFontSize=Number(e.target.value)||95;void refreshComposePreview();
+  }else if(id==='artPythonDivider'){
+   studioState.pythonDivider=e.target.checked;void refreshComposePreview();
+  }
+  else if(id==='artAiStyle'){studioState.aiStyle=e.target.value;void refreshComposePreview();}
+  else if(id==='artHideTitleCheck'){studioState.hideTitle=e.target.checked;void refreshComposePreview();}
  });
 
  modalRoot.addEventListener('input',e=>{
@@ -3094,7 +3174,7 @@ async function openArtworkStudio(targetKind='folder'){
   if(id==='artTitleInput'){studioState.title=e.target.value;scheduleCompose();}
   else if(id==='artSubtitleInput'){studioState.subtitle=e.target.value;scheduleCompose();}
   else if(id==='artBadgeInput'){studioState.badge=e.target.value;scheduleCompose();}
-  else if(id==='artAiPrompt'){studioState.aiPrompt=e.target.value;}
+  else if(id==='artAiPrompt'){studioState.aiPrompt=e.target.value;void refreshComposePreview();}
  });
 
  $('artTmdbSearch')?.addEventListener('keydown',e=>{
