@@ -27,6 +27,7 @@ import { getStudioDocument, saveStudioDocument, getStudioHistory, restoreStudioR
 import { loadStudioImport, getStudioImportStatus, saveStudioImport, validateStudioImport, previewWorkspaceChange, applyWorkspaceChange } from './aggregator/studio-import.js';
 import { prepareCoverCollections, getPreparedCover, registerCover, getCoverAdapterStatus, supportedCover, normalizeShape } from './aggregator/cover-adapter.js';
 import { STUDIO_SHAPES, STUDIO_PRESETS, getSavedStudioArtwork, saveDataUrlArtwork, composeStudioArtwork, decorateStudioBase, generateAiStudioArtwork, searchTmdbArtworkCandidates } from './aggregator/artwork-studio.js';
+import { listProjects, getProject, saveProject, deleteProject, saveAssetBuffer, exportArtworkFromDataUrl } from './aggregator/artwork-projects.js';
 import {composeOriginalMosaic,getOriginalMosaicCategories,originalMosaicStatus} from './aggregator/tmdb-mosaic.js';
 import {searchMosaicOptions,addCustomMosaicCategory} from './aggregator/mosaic-categories.js';
 import { getPublication, publishedCatalog, publishedMeta, localMetadata, registerPublicationProvider, removePublicationProvider, listPublicationProviders, invalidatePublication } from './aggregator/nuvio-publication.js';
@@ -424,10 +425,73 @@ app.post('/api/hub/artwork/save', requireLocalEdit, async (req, res) => {
     res.status(400).json({ error: e.message || 'Falha ao salvar capa localmente.' });
   }
 });
+app.get('/api/hub/artwork/projects', requireLocalEdit, (_req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ projects: listProjects() });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Erro ao listar projetos.' });
+  }
+});
+app.get('/api/hub/artwork/projects/:id', requireLocalEdit, (req, res) => {
+  try {
+    const proj = getProject(req.params.id);
+    if (!proj) return res.status(404).json({ error: 'Projeto não encontrado.' });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ project: proj });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'Erro ao carregar projeto.' });
+  }
+});
+app.post('/api/hub/artwork/projects', requireLocalEdit, (req, res) => {
+  try {
+    const saved = saveProject(req.body);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true, project: saved });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'Erro ao salvar projeto.' });
+  }
+});
+app.delete('/api/hub/artwork/projects/:id', requireLocalEdit, (req, res) => {
+  try {
+    const deleted = deleteProject(req.params.id);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true, deleted });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'Erro ao excluir projeto.' });
+  }
+});
+app.post('/api/hub/artwork/assets', requireLocalEdit, async (req, res) => {
+  try {
+    const { dataUrl, filenameHint } = req.body || {};
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Data URL de imagem inválido.' });
+    }
+    const match = dataUrl.match(/^data:image\/(png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=\s]+)$/i);
+    if (!match) return res.status(400).json({ error: 'Data URL de imagem malformado.' });
+    const buf = Buffer.from(match[2], 'base64');
+    const asset = await saveAssetBuffer(buf, { filenameHint });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true, asset });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'Falha ao processar asset.' });
+  }
+});
+app.post('/api/hub/artwork/export', requireLocalEdit, async (req, res) => {
+  try {
+    const exported = await exportArtworkFromDataUrl(req.body || {});
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: true, ...exported });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'Falha ao exportar arte.' });
+  }
+});
 app.get('/api/hub/artwork/studio/:filename', (req, res) => {
   const bytes = getSavedStudioArtwork(req.params.filename);
   if (!bytes) return res.status(404).end();
-  res.setHeader('Content-Type', 'image/webp');
+  const ext = path.extname(req.params.filename).toLowerCase();
+  const mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/webp';
+  res.setHeader('Content-Type', mime);
   res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=86400');
   res.end(bytes);
 });

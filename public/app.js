@@ -500,7 +500,7 @@ function renderCollections(){
  <p class="panel-sub">As alterações só serão exportadas depois de salvar.</p>
  <div class="editor-section"><label class="field"><span>Nome da coleção</span>${pen('groupTitle',g.title,'Ex.: Netflix')}</label></div>
  <div class="editor-section"><label class="field"><span>Imagem de fundo (HTTPS ou gerada no Hub)</span>${pen('groupBackdrop',g.backdropImageUrl||'','https://...')}</label>
- <div class="artwork-studio-trigger-row">${makeBtn('✦ Criar capa / ícone (TMDB / IA)','open-artwork-studio','btn btn-primary btn-small',(state.editable?'':'disabled')+' data-target="group"')}</div>
+ <div class="artwork-studio-trigger-row" style="display:flex;gap:6px;flex-wrap:wrap">${makeBtn('✦ Criar capa (Studio 2.0)','open-artwork-studio-v2','btn btn-primary btn-small',(state.editable?'':'disabled')+' data-target="group"')}${makeBtn('Modo Formulário','open-artwork-studio','btn btn-subtle btn-small',(state.editable?'':'disabled')+' data-target="group"')}</div>
  ${g.backdropImageUrl?`<div class="art-preview" style="aspect-ratio:16/9"><img src="${esc(g.backdropImageUrl)}" alt="Fundo da coleção"></div>`:''}</div>
  <div class="editor-section"><label class="field"><span>Modo de visualização</span>${select('groupViewMode',[['TABBED_GRID','Grade por abas'],['ROWS','Linhas por pasta'],['FOLLOW_LAYOUT','Seguir layout do Nuvio'],['GRID','Grade (legado)'],['HORIZONTAL','Horizontal (legado)']],g.viewMode||'TABBED_GRID')}</label></div>
  <div class="editor-section"><div class="section-head"><h3>Organizar coleção</h3></div>
@@ -511,7 +511,7 @@ function renderCollections(){
  <div class="section-head"><h2>Editar pasta</h2>${makeBtn('Excluir','delete-folder','btn btn-small btn-danger',state.editable?'':'disabled')}</div>
  <div class="editor-section"><label class="field"><span>Nome da pasta</span>${pen('folderTitle',f.title,'Nome da pasta')}</label></div>
  <div class="editor-section"><label class="field"><span>Imagem da capa (HTTPS ou gerada no Hub)</span>${pen('folderCover',f.customCoverImageUrl||f.coverImageUrl||'','https://...imagem.jpg')}</label>
- <div class="artwork-studio-trigger-row">${makeBtn('✦ Criar capa / ícone (TMDB / IA)','open-artwork-studio','btn btn-primary btn-small',(state.editable?'':'disabled')+' data-target="folder"')}</div>
+ <div class="artwork-studio-trigger-row" style="display:flex;gap:6px;flex-wrap:wrap">${makeBtn('✦ Criar capa (Studio 2.0)','open-artwork-studio-v2','btn btn-primary btn-small',(state.editable?'':'disabled')+' data-target="folder"')}${makeBtn('Modo Formulário','open-artwork-studio','btn btn-subtle btn-small',(state.editable?'':'disabled')+' data-target="folder"')}</div>
  ${(f.customCoverImageUrl||f.coverImageUrl)?`<div class="art-preview" style="aspect-ratio:${f.tileShape==='POSTER'?'2/3':f.tileShape==='PORTRAIT'?'3/4':f.tileShape==='SQUARE'?'1':'16/9'}"><img src="${esc(f.customCoverImageUrl||f.coverImageUrl)}" alt="Capa da pasta"></div>`:''}</div>
  <div class="editor-section"><label class="field"><span>Proporção para Nuvio Legacy</span>
  ${select('folderShape',[['LANDSCAPE','Landscape · 16:9'],['POSTER','Poster · 2:3'],['SQUARE','Square · 1:1'],['PORTRAIT','Portrait · 3:4 (converte para Poster no Legacy)']],f.tileShape||'LANDSCAPE')}</label></div>
@@ -2645,6 +2645,42 @@ globalThis.ArtworkStudioShapeBinding={
  TILE_SHAPE_TO_RATIO
 };
 
+async function openArtworkStudioV2(targetKind='folder'){
+ if(!writable())return;
+ const g=group(),f=folder();
+ const isGroup=targetKind==='group'||!f;
+ if(!g)return notify('Selecione uma coleção primeiro.');
+ const targetObj=isGroup?g:f;
+
+ if(globalThis.ArtworkStudio2?.open){
+  return globalThis.ArtworkStudio2.open({
+   state,
+   targetKind: isGroup ? 'group' : 'folder',
+   targetObj,
+   onApply: async (result) => {
+    const appliedTileShape = applyTargetTileShape(
+     targetObj,
+     result.tileShape || result.shape || 'LANDSCAPE',
+     { isGroup }
+    );
+    if(isGroup){
+     g.backdropImageUrl = result.url;
+     g.coverImageUrl = result.url;
+    }else if(f){
+     f.coverImageUrl = result.url;
+     f.customCoverImageUrl = result.url;
+     f.tileShape = appliedTileShape;
+     f.hideTitle = Boolean(result.hideTitle);
+    }
+    markDirty();
+    render();
+    notify(`Capa ${result.shape || ''} salva localmente e aplicada com sucesso!`);
+   }
+  });
+ }
+ return openArtworkStudio(targetKind);
+}
+
 async function openArtworkStudio(targetKind='folder'){
  if(!writable())return;
  const g=group(),f=folder();
@@ -3357,6 +3393,7 @@ async function onAction(action,el){
  case 'settings-tmdb-complete':return tmdbCompleteAuthorization();
  case 'settings-account-tvmaze':return saveSourceAccount('tvmaze');
  case 'preview-open':return globalThis.NuvioPreview.open(state);
+ case 'open-artwork-studio-v2':return openArtworkStudioV2(el.dataset.target||'folder');
  case 'open-artwork-studio':return openArtworkStudio(el.dataset.target||'folder');
  case 'collection-rescan':return refreshCollectionInventory(true);
  case 'collection-attach-external':return replaceCollectionSource();

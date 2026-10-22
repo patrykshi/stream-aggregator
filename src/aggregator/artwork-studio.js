@@ -89,10 +89,10 @@ function writeIndex(data) {
 export function isLocalStudioArtworkUrl(rawUrl) {
   if (typeof rawUrl !== 'string' || !rawUrl.trim()) return false;
   const trimmed = rawUrl.trim();
-  if (/^\/api\/hub\/artwork\/studio\/[a-zA-Z0-9_-]{8,80}\.webp$/i.test(trimmed)) return true;
+  if (/^\/api\/hub\/artwork\/studio\/[a-zA-Z0-9_-]{8,80}\.(webp|png|jpe?g)$/i.test(trimmed)) return true;
   try {
     const parsed = new URL(trimmed);
-    return /^\/api\/hub\/artwork\/studio\/[a-zA-Z0-9_-]{8,80}\.webp$/i.test(parsed.pathname);
+    return /^\/api\/hub\/artwork\/studio\/[a-zA-Z0-9_-]{8,80}\.(webp|png|jpe?g)$/i.test(parsed.pathname);
   } catch {
     return false;
   }
@@ -103,11 +103,11 @@ export function extractStudioArtworkFilename(rawUrl) {
   const trimmed = rawUrl.trim();
   const pathname = trimmed.startsWith('/') ? trimmed : new URL(trimmed).pathname;
   const filename = pathname.split('/').pop();
-  return /^[a-zA-Z0-9_-]{8,80}\.webp$/i.test(filename) ? filename : null;
+  return /^[a-zA-Z0-9_-]{8,80}\.(webp|png|jpe?g)$/i.test(filename) ? filename : null;
 }
 
 export function getSavedStudioArtwork(filename) {
-  if (typeof filename !== 'string' || !/^[a-zA-Z0-9_-]{8,80}\.webp$/i.test(filename)) return null;
+  if (typeof filename !== 'string' || !/^[a-zA-Z0-9_-]{8,80}\.(webp|png|jpe?g)$/i.test(filename)) return null;
   const fullPath = path.join(STUDIO_ART_DIR, filename);
   if (!fs.existsSync(fullPath)) return null;
   try {
