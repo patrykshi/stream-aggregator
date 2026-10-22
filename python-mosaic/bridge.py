@@ -36,10 +36,39 @@ def make(module, body):
     if category_group not in module.GROUPS:
         raise ValueError('Grupo não cadastrado no criador TMDB original.')
     category_name = str(body.get('category') or '')
+    custom = body.get('customCategory')
     matching = [c for c in module.GROUPS[category_group] if c.name == category_name]
-    if len(matching) != 1:
-        raise ValueError('Categoria não cadastrada no criador TMDB original.')
-    category = matching[0]
+    if isinstance(custom, dict):
+        name = str(custom.get('name') or '')
+        if name != category_name or len(name) > 100:
+            raise ValueError('Definição de categoria inválida.')
+        kind = str(custom.get('kind') or '')
+        value = str(custom.get('id') or '')
+        media = str(custom.get('media') or '')
+        if media not in ('movie', 'tv') or len(value) > 20:
+            raise ValueError('Categoria TMDB inválida.')
+        if kind in ('genre', 'keyword', 'provider', 'company') and not (value.isascii() and value.isdigit() and 0 < int(value) < 999999999):
+            raise ValueError('ID TMDB inválido.')
+        if kind == 'genre' and category_group == 'generos':
+            extra, genre_id = {}, int(value)
+        elif kind == 'keyword' and category_group in ('temas', 'generos'):
+            extra, genre_id = {'with_keywords': value}, None
+        elif kind == 'provider' and category_group == 'streaming':
+            extra, genre_id = {'with_watch_providers': value, 'watch_region': 'BR', 'with_watch_monetization_types': 'flatrate'}, None
+        elif kind == 'company' and category_group == 'estudios':
+            extra, genre_id = {'with_companies': value}, None
+        elif kind == 'country' and category_group == 'mundo' and len(value) == 2 and value.isascii() and value.isalpha():
+            extra, genre_id = {'with_origin_country': value.upper()}, None
+        elif kind == 'decade' and category_group == 'decadas' and value.isdigit() and 1880 <= int(value) <= 2090 and int(value) % 10 == 0:
+            extra, genre_id = {'primary_release_date.gte': f'{value}-01-01',
+                               'primary_release_date.lte': f'{int(value)+9}-12-31'}, None
+        else:
+            raise ValueError('Tipo de categoria incompatível.')
+        category = module.Category(name, media, genre_id, (52, 117, 162), extra)
+    else:
+        if len(matching) != 1:
+            raise ValueError('Categoria não cadastrada no criador TMDB original.')
+        category = matching[0]
     key = str(body.get('tmdbKey') or '')
     if not key or len(key) > 512:
         raise ValueError('A chave TMDB precisa estar cadastrada em Configurações.')
@@ -48,7 +77,7 @@ def make(module, body):
         raise ValueError('Quantidade de cartões inválida.')
     client = module.TMDB(key, 'pt-BR', 'BR')
     rng = random.Random(20260920 + sum(map(ord, category_name)))
-    entries = module.choose(client.discover(category, 3, 150), count, set(), rng)
+    entries = module.choose(client.discover(category, 5 if custom else 3, 5 if custom else 150), count, set(), rng)
     if len(entries) < 8:
         raise RuntimeError('O TMDB encontrou menos de oito fundos nessa categoria.')
     config = {'width': 1920, 'height': 1080, 'jpeg_quality': 88,

@@ -2681,6 +2681,10 @@ async function openArtworkStudio(targetKind='folder'){
   mosaicCategory:initialMosaicCategory,
   mosaicCards:16,
   mosaicImageDataUrl:'',
+  generatedBase:{ai:'', 'original-mosaic':''},
+  previewByMode:{},
+  lastGeneratedLabel:{},
+  mosaicSearchResults:[],
   mosaicBusy:false,
   shape:initialShape,
   tileShape:initialTileShape,
@@ -2690,6 +2694,7 @@ async function openArtworkStudio(targetKind='folder'){
   title:initialTitle,
   subtitle:initialSub.toUpperCase(),
   badge:'',
+  titleIcon:'',
   presetId:presets[0]?.id||'netflix',
   primary:'#E50914',
   secondary:'#090D16',
@@ -2727,7 +2732,7 @@ async function openArtworkStudio(targetKind='folder'){
  const currentShapeOption=shapeOptions.find(o=>o.shape===studioState.shape)||shapeOptions[0];
  const commonArtworkPayload=()=>({
    mode:studioState.mode,shape:studioState.shape,layout:studioState.layout,
-   title:studioState.title,subtitle:studioState.subtitle,
+   title:studioState.titleIcon?studioState.titleIcon+' '+studioState.title:studioState.title,subtitle:studioState.subtitle,
    badge:studioState.markMode==='text'?studioState.badge:'',
    logoDataUrl:['upload','draw'].includes(studioState.markMode)?studioState.uploadedMark:'',
    presetId:studioState.presetId,primary:studioState.primary,
@@ -2743,7 +2748,7 @@ async function openArtworkStudio(targetKind='folder'){
    <div class="artwork-studio-top-bar">
     <div class="artwork-studio-modes" role="tablist" aria-label="Modo de criação">
      <button type="button" class="artwork-mode-tab active" data-art-mode="mosaic">1. Colagem de títulos (2–4 imagens)</button>
-     <button type="button" class="artwork-mode-tab" data-art-mode="preset">2. Temas e cores (sem logo falso)</button>
+     <button type="button" class="artwork-mode-tab" data-art-mode="preset">2. Gradientes e cores</button>
      <button type="button" class="artwork-mode-tab" data-art-mode="ai">3. IA Gemini</button>
      <button type="button" class="artwork-mode-tab" data-art-mode="original-mosaic">4. Mosaicos originais TMDB</button>
     </div>
@@ -2780,22 +2785,17 @@ async function openArtworkStudio(targetKind='folder'){
      </div>
 
      <div id="artPanePreset" class="artwork-pane" hidden>
-      <p class="muted" style="margin:0 0 8px">Temas inspirados nas cores dos serviços. Não exibimos logos falsos nem simulamos marcas. Para usar o logo verdadeiro, importe a imagem original em PNG/WebP na área de marca abaixo.</p>
-      <div class="artwork-presets-grid">
-       ${presets.map(p=>`<button type="button" class="artwork-preset-card ${studioState.presetId===p.id?'active':''}" data-art-preset="${esc(p.id)}" style="--preset-color:${esc(p.primary)}">
-        <span class="artwork-preset-badge" style="background:${esc(p.primary)}" aria-hidden="true"></span>
-        <span><strong>${esc(p.name)}</strong><small>${esc(p.category==='streaming'?'Streaming':'Gênero / Tema')}</small></span>
-       </button>`).join('')}
-      </div>
+      <p class="muted">Crie fundos apenas com cores e gradientes personalizáveis, sem logos ou identificações de serviços.</p>
       <div class="artwork-inline-options" style="margin-top:12px">
        <label class="field"><span>Cor Principal</span><input type="color" id="artColorPrimary" value="${esc(studioState.primary)}"></label>
        <label class="field"><span>Cor de Destaque</span><input type="color" id="artColorAccent" value="${esc(studioState.accent)}"></label>
+       <label class="field"><span>Cor de fundo</span><input type="color" id="artColorSecondary" value="${esc(studioState.secondary)}"></label>
        <label class="field"><span>Textura de Fundo</span>
         <select id="artPattern">
-         <option value="glow">Brilho Radial</option>
-         <option value="rays">Feixes de Cinema</option>
-         <option value="rings">Anéis Concêntricos</option>
-         <option value="grid">Grade Studio</option>
+         <option value="glow">Cinema (brilho suave)</option>
+         <option value="plain">Linear horizontal</option>
+         <option value="diagonal">Linear diagonal</option>
+         <option value="radial">Radial central</option>
         </select>
        </label>
       </div>
@@ -2836,6 +2836,15 @@ async function openArtworkStudio(targetKind='folder'){
          ${[12,16,20,28].map(n=>`<option value="${n}" ${studioState.mosaicCards===n?'selected':''}>${n} imagens</option>`).join('')}
        </select></label>
       </div>
+      <div class="artwork-category-discovery">
+       <strong>Adicionar categoria do TMDB</strong>
+       <p class="muted">Pesquise gêneros, palavras-chave, serviços, estúdios, décadas ou países para ampliar a lista selecionada.</p>
+       <div class="artwork-search-row">
+        <input type="search" id="artMosaicSearchQuery" class="search" placeholder="Ex.: Ficção, BL, Pluto TV, A24, Japão...">
+        <button type="button" class="btn btn-subtle btn-small" id="artMosaicSearchBtn">Pesquisar</button>
+       </div>
+       <div id="artMosaicSearchResults" class="artwork-category-search-results" aria-live="polite"></div>
+      </div>
       <div class="settings-actions"><button type="button" id="artGenerateMosaicBtn" class="btn btn-primary" ${!mosaicData.configured?'disabled':''}>Gerar mosaico com TMDB</button></div>
       <p class="muted">${mosaicData.configured
         ?mosaicData.tmdbConfigured?'TMDB conectado. Clique para criar o mosaico real (a consulta pode demorar).':'Cadastre sua chave TMDB em Configurações → Integrações.'
@@ -2845,8 +2854,12 @@ async function openArtworkStudio(targetKind='folder'){
 
      <div class="artwork-typography-box">
       <div class="artwork-inline-options">
-       <label class="field"><span>Título exibido na capa</span><input id="artTitleInput" class="search" value="${esc(studioState.title)}" placeholder="Ex.: NETFLIX"></label>
-       <label class="field"><span>Subtítulo / Selo superior</span><input id="artSubtitleInput" class="search" value="${esc(studioState.subtitle)}" placeholder="Ex.: ORIGINAIS & CATÁLOGO"></label>
+       <label class="field"><span>Ícone ao lado do título (opcional)</span><select id="artTitleIcon">
+        <option value="">Sem ícone</option>
+        ${['✦','★','◆','◈','●','✧','♪','🔭','🎬'].map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}
+       </select></label>
+       <label class="field"><span>Título na capa (até 2 linhas)</span><input id="artTitleInput" class="search" value="${esc(studioState.title)}" placeholder="Ex.: Descobrir"></label>
+       <label class="field"><span>Subtítulo na capa (até 2 linhas)</span><input id="artSubtitleInput" class="search" value="${esc(studioState.subtitle)}" placeholder="Ex.: ORIGINAIS & CATÁLOGO"></label>
       </div>
       <div class="artwork-mark-editor">
        <label class="field"><span>Logo / Ícone da capa</span>
@@ -2885,6 +2898,7 @@ async function openArtworkStudio(targetKind='folder'){
       <img id="artPreviewImage" alt="Pré-visualização da capa gerada" hidden>
       <div id="artPreviewPlaceholder" class="artwork-preview-loading">Gerando pré-visualização...</div>
      </div>
+     <span class="artwork-draft-indicator" id="artDraftIndicator" aria-live="polite">A imagem-base será preservada ao trocar de aba.</span>
      <small id="artStudioStatus" class="addon-url-feedback is-neutral" role="status" aria-live="polite">A imagem e a proporção (${esc(studioState.tileShape)} · ${esc(studioState.ratio)}) serão vinculadas automaticamente.</small>
     </div>
    </div>
@@ -2892,10 +2906,14 @@ async function openArtworkStudio(targetKind='folder'){
   async()=>{
    const statusEl=$('artStudioStatus');
    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-neutral','Salvando capa localmente no Hub...');
+   clearTimeout(composeTimer);
+   // Save exactly what is edited, not a stale pre-typography snapshot.
+   if(studioState.mode==='ai'||studioState.mode==='original-mosaic')
+     await refreshComposePreview({failLoudly:true});
    let finalSaved=studioState.savedResult;
    if(!finalSaved){
     if(studioState.mode==='ai'||studioState.mode==='original-mosaic'){
-     const generated=studioState.mode==='ai'?studioState.aiImageDataUrl:studioState.mosaicImageDataUrl;
+     const generated=studioState.previewByMode[studioState.mode]?.dataUrl||'';
      if(!generated)throw Error('Clique em Gerar para criar a imagem antes de salvar.');
      finalSaved=await request('/api/hub/artwork/save',{method:'POST',
        body:JSON.stringify({dataUrl:generated,shape:studioState.shape,
@@ -2950,8 +2968,9 @@ async function openArtworkStudio(targetKind='folder'){
   if(summary)summary.textContent=labelMap[studioState.shape]||studioState.shape;
  };
 
- const refreshComposePreview=async({isAi=false,isMosaic=false}={})=>{
+ const refreshComposePreview=async({isAi=false,isMosaic=false,failLoudly=false}={})=>{
   if((isAi&&studioState.aiBusy)||(isMosaic&&studioState.mosaicBusy))return;
+  const mode=studioState.mode;
   const serial=++studioState.previewSerial;
   if(isAi)studioState.aiBusy=true;
   if(isMosaic)studioState.mosaicBusy=true;
@@ -2963,52 +2982,93 @@ async function openArtworkStudio(targetKind='folder'){
   const imgEl=$('artPreviewImage');
   const placeholder=$('artPreviewPlaceholder');
   const statusEl=$('artStudioStatus');
-  if(studioState.mode==='original-mosaic'&&!isMosaic){
-    studioState.mosaicImageDataUrl='';
-    if(imgEl){imgEl.hidden=true;imgEl.removeAttribute('src');}
-    if(placeholder){placeholder.hidden=false;placeholder.textContent='Escolha um gênero, tema ou streaming e clique em Gerar mosaico com TMDB.';}
-    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-neutral','O original cria fileiras diagonais com 12 a 28 backdrops do TMDB.');
-    return;
+  const indicator=$('artDraftIndicator');
+  const snapshot=studioState.previewByMode[mode];
+  const keepPreview=()=>{
+   if(!snapshot?.dataUrl)return false;
+   if(imgEl){imgEl.src=snapshot.dataUrl;imgEl.hidden=false;}
+   if(placeholder)placeholder.hidden=true;
+   if(indicator)indicator.textContent='✓ Prévia preservada • altere texto ou ícones sem gerar novamente.';
+   if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-valid','Imagem-base mantida para comparação e edição.');
+   return true;
+  };
+  const generated=mode==='ai'||mode==='original-mosaic';
+  const baseDataUrl=studioState.generatedBase[mode];
+  if(generated&&!baseDataUrl&&!isAi&&!isMosaic){
+   if(!keepPreview()){
+    if(imgEl)imgEl.hidden=true;
+    if(placeholder){placeholder.hidden=false;placeholder.textContent=mode==='ai'?
+     'Clique em Gerar com IA. A arte ficará disponível ao trocar de aba.':
+     'Clique em Gerar mosaico com TMDB. O mosaico ficará disponível ao trocar de aba.';}
+    if(indicator)indicator.textContent='Imagem ainda não gerada neste modo.';
+   }
+   return;
   }
-  if(studioState.mode==='ai'&&!isAi){
-    studioState.aiImageDataUrl='';
-    if(imgEl){imgEl.hidden=true;imgEl.removeAttribute('src');}
-    if(placeholder){placeholder.hidden=false;placeholder.textContent=presetsData.ai?.configured?
-      'Clique em Gerar Arte com IA para solicitar uma nova imagem ao Gemini.':
-      'Conecte uma chave Gemini em Configurações → Integrações.';}
-    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-neutral','A geração por IA só ocorre mediante clique explícito.');
-    return;
+  if(placeholder){placeholder.hidden=Boolean(snapshot?.dataUrl);placeholder.textContent=isMosaic?'Criando mosaico original com o TMDB...':
+   isAi?'Gerando imagem com Gemini...':'Atualizando elementos da capa...';}
+  let endpoint,payload;
+  if((isAi||isMosaic)&&generated){
+   endpoint=isAi?'/api/hub/artwork/generate-ai':'/api/hub/artwork/mosaic-compose';
+   payload={...commonArtworkPayload(),prompt:studioState.aiPrompt,style:studioState.aiStyle,
+    group:studioState.mosaicGroup,category:studioState.mosaicCategory,
+    cards:studioState.mosaicCards,save:false};
+  }else if(generated&&baseDataUrl){
+   endpoint='/api/hub/artwork/decorate-base';
+   payload={...commonArtworkPayload(),baseDataUrl,
+    accent:mode==='ai'?'#b8dfff':'#b9dcf9',save:false};
+  }else{
+   endpoint='/api/hub/artwork/compose';payload=commonArtworkPayload();
   }
-  if(placeholder){placeholder.hidden=false;placeholder.textContent=isMosaic?'Consultando backdrops do TMDB e montando fileiras diagonais...':
-    isAi?'Solicitando imagem real ao Gemini...':'Compondo prévia...';}
-  const endpoint=isMosaic?'/api/hub/artwork/mosaic-compose':
-    isAi?'/api/hub/artwork/generate-ai':'/api/hub/artwork/compose';
   try{
-   const res=await request(endpoint,{method:'POST',body:JSON.stringify({
-     ...commonArtworkPayload(),prompt:studioState.aiPrompt,style:studioState.aiStyle,
-     group:studioState.mosaicGroup,category:studioState.mosaicCategory,
-     cards:studioState.mosaicCards,save:false
-   })});
-   if(serial!==studioState.previewSerial)return;
+   const res=await request(endpoint,{method:'POST',body:JSON.stringify(payload)});
+   if((isAi||isMosaic)&&res?.baseDataUrl){
+    studioState.generatedBase[mode]=res.baseDataUrl;
+    studioState.lastGeneratedLabel[mode]=mode==='ai'?studioState.aiPrompt:
+       studioState.mosaicGroup+' / '+studioState.mosaicCategory;
+   }
+   // Keep data even if this request finished after switching modes.
+   if(res?.dataUrl)studioState.previewByMode[mode]={dataUrl:res.dataUrl,
+     width:res.width,height:res.height,shape:res.shape};
+   if(serial!==studioState.previewSerial||mode!==studioState.mode)return;
    if(res?.dataUrl&&imgEl){
     imgEl.src=res.dataUrl;imgEl.hidden=false;
-    if(isAi)studioState.aiImageDataUrl=res.dataUrl;
-    if(isMosaic)studioState.mosaicImageDataUrl=res.dataUrl;
     if(placeholder)placeholder.hidden=true;
+    if(indicator)indicator.textContent=generated?'✓ Arte original preservada: você pode editar os elementos e voltar a esta aba.':'✓ Prévia deste modo preservada.';
     if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-valid',
-      `Prévia ${res.provider||'local'} pronta em ${res.width}×${res.height}px. Salve e aplique para vincular.`);
+     `Prévia pronta (${res.width}×${res.height}px). Os elementos podem ser editados sem nova geração.`);
    }
   }catch(err){
-   if(serial!==studioState.previewSerial)return;
-   if(imgEl)imgEl.hidden=true;
-   if(placeholder){placeholder.hidden=false;placeholder.textContent=err.message||'Erro ao renderizar prévia.';}
+   if(serial!==studioState.previewSerial||mode!==studioState.mode)return;
+   if(!keepPreview()){
+    if(imgEl)imgEl.hidden=true;
+    if(placeholder){placeholder.hidden=false;placeholder.textContent=err.message||'Falha ao renderizar.';}
+   }
    if(statusEl)setAddonUrlFeedbackState(null,statusEl,'is-error',err.message||'Falha ao compor prévia.');
+   if(failLoudly)throw err;
   }finally{
    if(isAi)studioState.aiBusy=false;
    if(isMosaic)studioState.mosaicBusy=false;
    if(generateBtn)generateBtn.disabled=studioState.aiBusy;
    if(mosaicButton)mosaicButton.disabled=studioState.mosaicBusy;
   }
+ };
+
+ const restoreOrRefreshMode=()=>{
+  // Immediate restoration, then only re-compose a cached background on changes.
+  const mode=studioState.mode;
+  const imgEl=$('artPreviewImage'),placeholder=$('artPreviewPlaceholder');
+  const snapshot=studioState.previewByMode[mode];
+  ++studioState.previewSerial;
+  if(snapshot?.dataUrl&&imgEl){
+   imgEl.src=snapshot.dataUrl;imgEl.hidden=false;
+   if(placeholder)placeholder.hidden=true;
+   $('artDraftIndicator').textContent='✓ Imagem preservada deste modo.';
+   // Redesenha somente a camada de texto/ícones com o mesmo fundo, sem chamar a IA ou TMDB.
+   // Isso também propaga mudanças feitas em outra aba.
+   if(studioState.generatedBase[mode])void refreshComposePreview();
+   return;
+  }
+  void refreshComposePreview();
  };
 
  const scheduleCompose=()=>{
@@ -3054,6 +3114,46 @@ async function openArtworkStudio(targetKind='folder'){
   }
  };
 
+ const renderMosaicCategoryOptions=()=>{
+  const target=$('artMosaicCategory');if(!target)return;
+  target.innerHTML=(mosaicData.groups?.[studioState.mosaicGroup]||[]).map(c=>
+   `<option value="${esc(c.name)}" ${c.name===studioState.mosaicCategory?'selected':''}>${esc(c.name)}${c.custom?' · adicionado':''}</option>`).join('');
+ };
+ const searchMosaicCategories=async()=>{
+  const target=$('artMosaicSearchResults'),q=$('artMosaicSearchQuery')?.value.trim()||'';
+  if(!target)return;
+  if(q.length<2){target.textContent='Digite dois ou mais caracteres para buscar no TMDB.';return;}
+  target.textContent='Pesquisando categorias oficiais no TMDB...';
+  const group=studioState.mosaicGroup;
+  try{
+   const data=await request('/api/hub/artwork/mosaic-search',{method:'POST',
+    body:JSON.stringify({group,q})});
+   if(group!==studioState.mosaicGroup)return;
+   studioState.mosaicSearchResults=data.items||[];
+   target.innerHTML=studioState.mosaicSearchResults.length?
+    studioState.mosaicSearchResults.map((item,i)=>
+     `<button type="button" data-art-category-add="${i}" class="btn btn-subtle btn-small" title="Adicionar à lista ${esc(mosaicGroupLabels[group]||group)}">+ ${esc(item.name)} <small>${esc(item.media==='tv'?'Séries':'Filmes')}</small></button>`).join(''):
+     '<span class="muted">Nenhuma categoria encontrada. Experimente outro termo.</span>';
+  }catch(err){target.textContent=err.message||'Erro ao buscar no TMDB.';}
+ };
+ const addMosaicCategory=async(index)=>{
+  const option=studioState.mosaicSearchResults[index],group=studioState.mosaicGroup;
+  if(!option)return;
+  const target=$('artMosaicSearchResults');
+  if(target)target.textContent='Adicionando à lista...';
+  try{
+   await request('/api/hub/artwork/mosaic-add',{method:'POST',
+    body:JSON.stringify({group,option})});
+   const result=await request('/api/hub/artwork/mosaic-categories');
+   mosaicData.groups=result.groups||mosaicData.groups;
+   studioState.mosaicGroup=group;studioState.mosaicCategory=option.name;
+   renderMosaicCategoryOptions();
+   if(target)target.textContent=`✓ ${option.name} adicionado à lista de ${mosaicGroupLabels[group]||group}.`;
+   notify(`Categoria ${option.name} disponível no gerador TMDB.`);
+   // Keep the previous artwork; only pressing Generate creates a new one.
+  }catch(err){if(target)target.textContent=err.message||'Não foi possível adicionar.';}
+ };
+
  const updateMarkControls=()=>{
   if($('artMarkTextBox'))$('artMarkTextBox').hidden=studioState.markMode!=='text';
   if($('artMarkUploadBox'))$('artMarkUploadBox').hidden=studioState.markMode!=='upload';
@@ -3090,7 +3190,7 @@ async function openArtworkStudio(targetKind='folder'){
    $('artPanePreset').hidden=studioState.mode!=='preset';
    $('artPaneAi').hidden=studioState.mode!=='ai';
    $('artPaneOriginalMosaic').hidden=studioState.mode!=='original-mosaic';
-   void refreshComposePreview();
+   restoreOrRefreshMode();
    return;
   }
   const shapeBtn=e.target.closest('[data-art-shape],[data-art-ratio]');
@@ -3161,6 +3261,11 @@ async function openArtworkStudio(targetKind='folder'){
    void loadTmdbCandidates($('artTmdbSearch')?.value||'');
    return;
   }
+  if(e.target.id==='artMosaicSearchBtn'){
+   void searchMosaicCategories();return;
+  }
+  const categoryAdd=e.target.closest('[data-art-category-add]');
+  if(categoryAdd){void addMosaicCategory(Number(categoryAdd.dataset.artCategoryAdd));return;}
   if(e.target.id==='artGenerateMosaicBtn'){
    void refreshComposePreview({isMosaic:true});return;
   }
@@ -3180,8 +3285,10 @@ async function openArtworkStudio(targetKind='folder'){
    renderTmdbCandidatesGrid();
    void refreshComposePreview();
   }else if(id==='artColorPrimary'){studioState.primary=e.target.value;scheduleCompose();}
+  else if(id==='artColorSecondary'){studioState.secondary=e.target.value;scheduleCompose();}
   else if(id==='artColorAccent'){studioState.accent=e.target.value;scheduleCompose();}
   else if(id==='artPattern'){studioState.pattern=e.target.value;void refreshComposePreview();}
+  else if(id==='artTitleIcon'){studioState.titleIcon=e.target.value;void refreshComposePreview();}
   else if(id==='artMarkMode'){
    studioState.markMode=e.target.value;studioState.uploadedMark='';
    updateMarkControls();void refreshComposePreview();
@@ -3197,14 +3304,14 @@ async function openArtworkStudio(targetKind='folder'){
   }else if(id==='artMosaicGroup'){
    studioState.mosaicGroup=e.target.value;
    studioState.mosaicCategory=mosaicData.groups?.[studioState.mosaicGroup]?.[0]?.name||'';
-   const target=$('artMosaicCategory');
-   if(target)target.innerHTML=(mosaicData.groups?.[studioState.mosaicGroup]||[]).map(c=>
-     `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
-   void refreshComposePreview();
+   renderMosaicCategoryOptions();
+   studioState.mosaicSearchResults=[];
+   if($('artMosaicSearchResults'))$('artMosaicSearchResults').textContent='';
+   restoreOrRefreshMode();
   }else if(id==='artMosaicCategory'){
-   studioState.mosaicCategory=e.target.value;void refreshComposePreview();
+   studioState.mosaicCategory=e.target.value;restoreOrRefreshMode();
   }else if(id==='artMosaicCards'){
-   studioState.mosaicCards=Number(e.target.value)||16;void refreshComposePreview();
+   studioState.mosaicCards=Number(e.target.value)||16;restoreOrRefreshMode();
   }
   else if(id==='artAiStyle'){studioState.aiStyle=e.target.value;void refreshComposePreview();}
   else if(id==='artHideTitleCheck'){studioState.hideTitle=e.target.checked;void refreshComposePreview();}
@@ -3216,6 +3323,10 @@ async function openArtworkStudio(targetKind='folder'){
   else if(id==='artSubtitleInput'){studioState.subtitle=e.target.value;scheduleCompose();}
   else if(id==='artBadgeInput'){studioState.badge=e.target.value;scheduleCompose();}
   else if(id==='artAiPrompt'){studioState.aiPrompt=e.target.value;void refreshComposePreview();}
+ });
+
+ $('artMosaicSearchQuery')?.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();void searchMosaicCategories();}
  });
 
  $('artTmdbSearch')?.addEventListener('keydown',e=>{

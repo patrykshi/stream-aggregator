@@ -128,3 +128,10 @@ A área **Coleções → Criar capa/ícone** agora oferece quatro processos comp
 **Ícones próprios:** no seletor de marca, é possível digitar uma sigla/símbolo com o teclado, escolher símbolos genéricos ou desenhar com mouse/toque; o desenho transparente é renderizado na capa. O modo **Sem logo** evita utilizar ícones não autorizados ou siglas de streaming que imitem uma marca oficial.
 
 **Segurança:** APIs de criação permanecem locais; a versão pública só serve imagens WebP geradas. As chaves são salvas somente em `data/hub-integrations.json` (fora do Git). O gerador de mosaicos recebe a chave TMDB exclusivamente no processo Python local, busca imagens da API oficial, usa arquivos temporários e não recebe endereços arbitrários do navegador. O gerador dourado anterior foi retirado do Nuvio Hub.
+
+### Artwork Studio: rascunho e categorias livres
+
+- A arte-base gerada pelo Gemini ou pelo gerador de mosaicos original permanece na memória da sessão do editor enquanto ele estiver aberto. Trocar de aba, alterar títulos, ícones, selo ou proporção recompõe a imagem **sem gerar novamente**, e salvar usa a prévia editada. Ao sair do editor sem salvar, o rascunho temporário não é publicado; **Salvar e aplicar** fixa a capa na coleção/pasta.
+- **Gradientes e cores** substitui a seleção antiga de temas/serviços com siglas e logos incorretos. Edite cor principal, fundo, destaque e padrão. Uma opção separada permite colocar um símbolo próximo ao nome, como `✦ Descobrir`.
+- O modo **Mosaicos originais TMDB** inclui **Pesquisar e adicionar categoria** em seis listas: gêneros (incluindo subgêneros por palavras-chave do TMDB), temas, streaming, estúdios, décadas e países. As opções selecionadas são validadas pelo catálogo TMDB e salvas em `data/mosaic-categories.json`, preservadas nos backups automáticos.
+- Os textos são adaptados ao tamanho final, quebrados em até duas linhas e desenhados com contorno de contraste sobre a imagem. Nas prévias verticais e horizontais o posicionamento é ajustado ao formato.

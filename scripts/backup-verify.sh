@@ -27,7 +27,7 @@ for file in data/studio-import.json data/profiles.json data/hub-integrations.jso
   test -s "$RESTORE/$file"
   cmp -s "$ROOT/$file" "$RESTORE/$file"
 done
-for optional in cloudflared/config.yml cloudflared/credentials.json; do
+for optional in cloudflared/config.yml cloudflared/credentials.json data/mosaic-categories.json; do
   if [[ -f "$ROOT/$optional" ]]; then
     test -s "$RESTORE/$optional"
     cmp -s "$ROOT/$optional" "$RESTORE/$optional"
