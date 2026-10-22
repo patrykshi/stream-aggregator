@@ -1277,3 +1277,23 @@ body.nuvio-preview-open{overflow:hidden}
  .nuvio-preview-hero-carousel{margin:0 -14px 18px;padding:18px}
 }
 
+
+/* Layouts específicos da prévia, sem alterar a biblioteca publicada no Nuvio. */
+.nuvio-preview-layout-switch{display:flex;gap:3px;border:1px solid #2c4157;background:#0a111c;padding:3px;border-radius:10px}
+.nuvio-preview-layout-switch button{border:0;border-radius:7px;padding:8px 10px;background:transparent;color:#9eb7cf;font-size:12px;font-weight:700;white-space:nowrap}
+.nuvio-preview-layout-switch button.active{color:#081320;background:#d7e8f6}
+.nuvio-preview-device.layout-classic .nuvio-preview-hero-carousel{min-height:180px;padding-top:16px;padding-bottom:16px}
+.nuvio-preview-device.layout-classic .nuvio-preview-rails-container{gap:14px}
+.nuvio-preview-device.layout-classic .nuvio-preview-folder-card{flex-basis:162px}
+.nuvio-preview-device.layout-classic .nuvio-preview-hero-title{font-size:clamp(23px,2.7vw,34px)}
+.nuvio-preview-device.layout-grid .nuvio-preview-hero-carousel{display:none}
+.nuvio-preview-device.layout-grid .nuvio-preview-rails-container{padding-top:28px;gap:28px}
+.nuvio-preview-device.layout-grid .nuvio-preview-rail{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));overflow:visible;gap:13px}
+.nuvio-preview-device.layout-grid .nuvio-preview-folder-card{width:100%;flex:initial}
+.nuvio-preview-device.layout-grid .nuvio-preview-folder-card .nuvio-preview-art{width:100%}
+.nuvio-preview-device .nuvio-preview-title:focus-visible,
+.nuvio-preview-device .nuvio-preview-folder-card:focus-visible,
+.nuvio-preview-device .nuvio-preview-tab:focus-visible,
+.nuvio-preview-device .nuvio-preview-rail-icon:focus-visible{outline:3px solid #7bcaff;outline-offset:2px;z-index:3}
+@media(max-width:700px){.nuvio-preview-layout-switch{order:1;width:100%;justify-content:space-around}.nuvio-preview-layout-switch button{flex:1}.nuvio-preview-device.mobile.layout-grid .nuvio-preview-rail{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}
+@media(prefers-reduced-motion:reduce){.nuvio-preview-device .nuvio-preview-folder-card,.nuvio-preview-device .nuvio-preview-hero-image{transition:none!important}.nuvio-preview-device .nuvio-preview-skeleton-card{animation:none!important}}
