@@ -227,7 +227,7 @@ async function createFallbackTileBuffer(width, height, primary = '#1e3a8a', seco
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
-function buildOverlaySvg({
+export function buildOverlaySvg({
   width,
   height,
   title = '',

@@ -27,8 +27,7 @@ import { getStudioDocument, saveStudioDocument, getStudioHistory, restoreStudioR
 import { loadStudioImport, getStudioImportStatus, saveStudioImport, validateStudioImport, previewWorkspaceChange, applyWorkspaceChange } from './aggregator/studio-import.js';
 import { prepareCoverCollections, getPreparedCover, registerCover, getCoverAdapterStatus, supportedCover, normalizeShape } from './aggregator/cover-adapter.js';
 import { STUDIO_SHAPES, STUDIO_PRESETS, getSavedStudioArtwork, saveDataUrlArtwork, composeStudioArtwork, generateAiStudioArtwork, searchTmdbArtworkCandidates } from './aggregator/artwork-studio.js';
-import {composePythonArtwork,pythonCoverStatus} from './aggregator/python-cover.js';
-import {fetchRemoteImageBuffer} from './aggregator/artwork-studio.js';
+import {composeOriginalMosaic,getOriginalMosaicCategories,originalMosaicStatus} from './aggregator/tmdb-mosaic.js';
 import { getPublication, publishedCatalog, publishedMeta, localMetadata, registerPublicationProvider, removePublicationProvider, listPublicationProviders, invalidatePublication } from './aggregator/nuvio-publication.js';
 
 dotenv.config();
@@ -349,7 +348,7 @@ app.get('/api/hub/artwork/studio-presets', requireLocalEdit, (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({ shapes: STUDIO_SHAPES, presets: STUDIO_PRESETS.map(p=>({...p,badge:''})),
     ai:{provider:'Gemini',configured:integrationStatuses().gemini.configured},
-    python:pythonCoverStatus() });
+    mosaic:originalMosaicStatus() });
 });
 app.post('/api/hub/artwork/tmdb-candidates', requireLocalEdit, async (req, res) => {
   try {
@@ -385,11 +384,13 @@ app.post('/api/hub/artwork/compose', requireLocalEdit, async (req, res) => {
     res.status(400).json({ error: e.message || 'Falha ao compor capa.' });
   }
 });
-app.post('/api/hub/artwork/python-compose', requireLocalEdit, async (req,res)=>{
- try{
-  const result=await composePythonArtwork(req.body||{}, {getBackground:fetchRemoteImageBuffer});
-  res.setHeader('Cache-Control','no-store');res.json(result);
- }catch(e){res.status(e.status||400).json({error:e.message||'Falha no motor Python.'});}
+app.get('/api/hub/artwork/mosaic-categories', requireLocalEdit, async (_req,res)=>{
+ try{res.setHeader('Cache-Control','no-store');res.json(await getOriginalMosaicCategories());}
+ catch(e){res.status(e.status||503).json({error:e.message||'Motor de mosaicos indisponível.'});}
+});
+app.post('/api/hub/artwork/mosaic-compose',requireLocalEdit,async(req,res)=>{
+ try{res.setHeader('Cache-Control','no-store');res.json(await composeOriginalMosaic(req.body||{}));}
+ catch(e){res.status(e.status||400).json({error:e.message||'Falha ao compor mosaico.'});}
 });
 app.post('/api/hub/artwork/generate-ai', requireLocalEdit, async (req, res) => {
   try {

@@ -150,9 +150,12 @@ try {
   assert.equal(requests.some(x=>x.path==='/api/hub/artwork/generate-ai'),false,
     'AI billing must only happen after explicit click');
   assert.match(await ev("document.querySelector('#artPaneAi').innerText"),/Gemini/);
-  await click('[data-art-mode=python]');
-  await wait(() => ev("!document.querySelector('#artPanePython').hidden"), 'Original Python cover engine');
-  assert.equal(await ev("!!document.querySelector('#artPythonColor')"),true);
+  await click('[data-art-mode=original-mosaic]');
+  await wait(() => ev("!document.querySelector('#artPaneOriginalMosaic').hidden"), 'original TMDB mosaics');
+  assert.equal(await ev("!!document.querySelector('#artMosaicCategory')"),true);
+  assert.equal(await ev("!!document.querySelector('#artGenerateMosaicBtn')"),true);
+  assert.equal(requests.some(x=>x.path==='/api/hub/artwork/mosaic-compose'),false,
+    'TMDB mosaic must only be generated after explicit click');
   await click('#modalCancel');
   await wait(() => ev("document.querySelector('#modal').hidden"), 'close Artwork Studio');
 
