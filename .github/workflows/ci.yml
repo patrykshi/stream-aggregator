@@ -17,5 +17,6 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run build
+      - run: bash -n scripts/deploy-verified.sh scripts/backup-verify.sh
       - run: npm test
       - run: docker build --tag nuvio-hub:ci .
