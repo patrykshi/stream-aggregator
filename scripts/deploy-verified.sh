@@ -39,8 +39,15 @@ for i in {1..40}; do
   sleep 1
 done
 [[ "$healthy" == 'true' ]] || { false; }
+# A primeira publicação pode consultar muitos manifestos remotos antes de
+# aquecer o cache; 15 segundos causavam rollback apesar do container saudável.
 for route in /manifest.json /collections.json; do
-  curl -fsS -m 15 "http://127.0.0.1:7001$route" >/dev/null
+  ok=false
+  for attempt in 1 2; do
+    if curl -fsS -m 60 "http://127.0.0.1:7001$route" >/dev/null 2>&1; then ok=true;break;fi
+    sleep 2
+  done
+  [[ "$ok" == 'true' ]] || { echo "Publicação sem resposta no endpoint $route após nova tentativa." >&2; false; }
 done
 # Inspeciona o ingress público pela própria rede do container; a porta não é publicada no host.
 docker exec stream-aggregator wget -q -O /dev/null http://127.0.0.1:7002/health
