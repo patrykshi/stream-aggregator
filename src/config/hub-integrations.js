@@ -3,7 +3,7 @@ import path from 'node:path';
 import { resolveDataDir, readJsonFile, writeAtomicJsonFile } from './json-store.js';
 const DIR=resolveDataDir();
 const FILE=path.join(DIR,'hub-integrations.json');
-const KEYS={tmdb:'TMDB_API_KEY',trakt:'TRAKT_CLIENT_ID',mdblist:'MDBLIST_API_KEY'};
+const KEYS={tmdb:'TMDB_API_KEY',trakt:'TRAKT_CLIENT_ID',mdblist:'MDBLIST_API_KEY',gemini:'GEMINI_API_KEY'};
 function read(){
  return readJsonFile(FILE,{},{strict:true,requireObject:true,errorMessage:'Não foi possível ler a configuração das integrações.'});
 }

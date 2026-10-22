@@ -110,13 +110,23 @@ describe('Nuvio TV Cover Adapter',()=>{
      assert.equal(supportedCover(saved.url),true);
    }
 
+   await assert.rejects(()=>generateAiStudioArtwork({prompt:'Cyberpunk',save:false}),/Gemini não configurado/);
+   const {updateIntegrationSettings}=await import('../src/config/hub-integrations.js');
+   updateIntegrationSettings({gemini:{value:'test-gemini-api-key-very-private'}});
+   const fakeGeminiImage=await sharp({create:{width:700,height:1000,channels:3,background:'#04060a'}}).png().toBuffer();
    const aiRes=await generateAiStudioArtwork({
-     prompt:'Cyberpunk neon samurai city at night',
-     shape:'POSTER',
-     title:'Sci-Fi Cult',
-     subtitle:'Clássicos',
-     apiKey:''
+     prompt:'Cyberpunk neon samurai city at night',shape:'POSTER',
+     title:'Sci-Fi Cult',subtitle:'Clássicos',save:false,
+     fetchImpl:async(url,opts)=>{
+       assert.ok(!url.includes('test-gemini-api-key'), 'API key never in the URL');
+       assert.equal(opts.headers['x-goog-api-key'],'test-gemini-api-key-very-private');
+       assert.equal(JSON.parse(opts.body).generationConfig.imageConfig.aspectRatio,'2:3');
+       return {ok:true,json:async()=>({candidates:[{content:{parts:[{
+         inlineData:{mimeType:'image/png',data:fakeGeminiImage.toString('base64')}
+       }]}}]})};
+     }
    });
+   assert.equal(aiRes.provider,'gemini');
    assert.equal(aiRes.shape,'POSTER');
    assert.equal(aiRes.width,600);
    assert.equal(aiRes.height,900);

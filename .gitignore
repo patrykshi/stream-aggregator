@@ -62,3 +62,6 @@ data/backup-*/
 
 # Gravações de tela podem conter informações privadas; manter fora do repositório.
 /public/assets/aistudio/*.mp4
+
+**/__pycache__/
+**/*.pyc

@@ -115,3 +115,16 @@ Os dados e credenciais locais **nunca devem ser incluídos em commits**. Execute
 - O processo grava backups/revisões do Studio, verifica conflitos, preserva vínculos e mantém os endpoints JSON atualizados. O import na conta Nuvio continua manual, pelos fluxos oficiais da conta.
 
 A verificação `npm run build` analisa a sintaxe JavaScript de frontend, backend, scripts e testes, incluindo os módulos de TV.
+
+## Artwork Studio — Python, logos originais, ícones e Gemini
+
+A área **Coleções → Criar capa/ícone** agora oferece quatro processos complementares:
+
+1. **Mosaico TMDB:** composição local usando pôsteres e fundos.
+2. **Temas e cores:** presets inspirados em gêneros e serviços, sem fabricar logos. A seleção **Sem logo nem ícone** é o padrão. Também é possível importar seu arquivo de logo oficial (PNG, WebP ou JPEG, até 2 MB), respeitando os direitos de uso.
+3. **Gemini:** geração de imagem **real** por API oficial. Cadastre a chave em **Configurações → Integrações → Gemini**. Não é feita nenhuma requisição paga sem clicar em **Gerar Arte com IA**. Uma geração é reaproveitada ao salvar, sem uma segunda chamada. Sem chave ou sem resposta de imagem, o sistema mostra erro, em vez de chamar imagem procedural de IA. Consulte as condições de cobrança do fornecedor.
+4. **Criador Python do PC:** usa o `render.py` do gerador Pillow que já existia no computador, com cores douradas, tipografia e divisor. O Docker monta o arquivo original e o diretório `assets/` somente em leitura, sem copiá-los para o repositório e sem alterar o programa Python original. Defina `PYTHON_COVER_PATH` no `.env` se o gerador estiver em outra pasta.
+
+**Ícones próprios:** no seletor de marca, é possível digitar uma sigla/símbolo com o teclado, escolher símbolos genéricos ou desenhar com mouse/toque; o desenho transparente é renderizado na capa. O modo **Sem logo** evita utilizar ícones não autorizados ou siglas de streaming que imitem uma marca oficial.
+
+**Segurança:** APIs de criação permanecem locais; a versão pública só serve imagens WebP geradas. As chaves são salvas somente em `data/hub-integrations.json` (fora do Git). O criador Python recebe imagens já obtidas pelo Hub e não baixa URL arbitrária.

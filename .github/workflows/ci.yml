@@ -21,3 +21,4 @@ jobs:
       - run: npm test
       - run: docker build --tag nuvio-hub:ci .
       - run: docker run --rm --entrypoint sh nuvio-hub:ci -c 'test -r /app/src/server.js && test -r /app/public/index.html && node --check /app/src/server.js'
+      - run: docker run --rm --entrypoint sh nuvio-hub:ci -c 'python3 -c "from PIL import Image; import ast; ast.parse(open(\"/app/python-cover/bridge.py\").read())"'

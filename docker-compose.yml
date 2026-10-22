@@ -24,12 +24,16 @@ services:
       - NODE_ENV=production
       - BIND_HOST=0.0.0.0
       - PUBLIC_PORT=7002
+      - PYTHON_COVER_ENABLED=1
+      - PYTHON_COVER_SOURCE=/app/python-legacy
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - TMDB_API_KEY=${TMDB_API_KEY:-}
       - TRAKT_CLIENT_ID=${TRAKT_CLIENT_ID:-}
       - MDBLIST_API_KEY=${MDBLIST_API_KEY:-}
     volumes:
       - ./data:/app/data
+      - ${PYTHON_COVER_PATH:-/home/patryk-rocha/Projetos/Midia/TMDB/tmdb-capas}/render.py:/app/python-legacy/render.py:ro
+      - ${PYTHON_COVER_PATH:-/home/patryk-rocha/Projetos/Midia/TMDB/tmdb-capas}/assets:/app/python-legacy/assets:ro
     logging:
       driver: "json-file"
       options:

@@ -91,7 +91,7 @@ try {
   });
   const ev = async expression => {
     const res = await send('Runtime.evaluate', {expression, returnByValue: true, awaitPromise: true});
-    if (res.exceptionDetails) throw Error(res.exceptionDetails.text);
+    if (res.exceptionDetails) throw Error(res.exceptionDetails.exception?.description || res.exceptionDetails.text);
     return res.result.value;
   };
   const click = selector => ev(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)throw Error('Missing ${selector}');el.click();return true})()`);
@@ -131,6 +131,31 @@ try {
   assert.ok(requests.length >= 1, 'Preview should load title samples');
   assert.deepEqual(requests.filter(x => x.path !== '/api/hub/preview/catalog-items'), [], 'No writes to workspace');
   assert.deepEqual(errors, [], 'Browser JS exceptions');
+  await click('[data-group]');
+  await wait(() => ev("!!document.querySelector('[data-action=open-artwork-studio][data-target=group]')"), 'group editor');
+  await click('[data-action=open-artwork-studio][data-target=group]');
+  await wait(() => ev("!!document.querySelector('#artMarkMode')"), 'Artwork Studio editor');
+  assert.equal(await ev("document.querySelector('#artMarkMode').value"),'none');
+  await click('[data-art-mode=preset]');
+  assert.equal(await ev("Array.from(document.querySelectorAll('.artwork-preset-badge')).every(el=>!el.textContent.trim())"),true,
+    'Streaming preset cannot show simulated logos');
+  await ev("(()=>{const e=document.querySelector('#artMarkMode');e.value='text';e.dispatchEvent(new Event('change',{bubbles:true}));})()");
+  await wait(() => ev("!document.querySelector('#artMarkTextBox').hidden"), 'Keyboard symbol editor');
+  await click('[data-art-glyph="★"]');
+  assert.equal(await ev("document.querySelector('#artBadgeInput').value"),'★');
+  await ev("(()=>{const e=document.querySelector('#artMarkMode');e.value='draw';e.dispatchEvent(new Event('change',{bubbles:true}));})()");
+  assert.equal(await ev("!!document.querySelector('#artIconCanvas')"),true);
+  await click('[data-art-mode=ai]');
+  await sleep(200);
+  assert.equal(requests.some(x=>x.path==='/api/hub/artwork/generate-ai'),false,
+    'AI billing must only happen after explicit click');
+  assert.match(await ev("document.querySelector('#artPaneAi').innerText"),/Gemini/);
+  await click('[data-art-mode=python]');
+  await wait(() => ev("!document.querySelector('#artPanePython').hidden"), 'Original Python cover engine');
+  assert.equal(await ev("!!document.querySelector('#artPythonColor')"),true);
+  await click('#modalCancel');
+  await wait(() => ev("document.querySelector('#modal').hidden"), 'close Artwork Studio');
+
   await click('[data-view=settings]');
   await wait(() => ev("document.querySelector('#catalogAutoRefresh') !== null"), 'refresh settings');
   assert.equal(await ev("document.querySelector('#catalogAutoRefresh').checked"),false,'Refresh opt-in default');

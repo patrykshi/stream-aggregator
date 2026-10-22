@@ -1297,3 +1297,12 @@ body.nuvio-preview-open{overflow:hidden}
 .nuvio-preview-device .nuvio-preview-rail-icon:focus-visible{outline:3px solid #7bcaff;outline-offset:2px;z-index:3}
 @media(max-width:700px){.nuvio-preview-layout-switch{order:1;width:100%;justify-content:space-around}.nuvio-preview-layout-switch button{flex:1}.nuvio-preview-device.mobile.layout-grid .nuvio-preview-rail{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}
 @media(prefers-reduced-motion:reduce){.nuvio-preview-device .nuvio-preview-folder-card,.nuvio-preview-device .nuvio-preview-hero-image{transition:none!important}.nuvio-preview-device .nuvio-preview-skeleton-card{animation:none!important}}
+
+/* Editor de marcas: símbolos digitados, logo enviado e desenho original. */
+.artwork-mark-editor{margin-top:10px;border:1px solid #33465d;border-radius:12px;padding:12px;display:grid;gap:12px;background:#0c1827}
+.artwork-mark-editor [hidden]{display:none!important}
+.artwork-glyphs{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.artwork-glyphs button{padding:7px 11px;background:#1a2c41;border:1px solid #40607c;color:#e9f4ff;font-size:17px;border-radius:8px;cursor:pointer}
+.artwork-glyphs button:hover,.artwork-glyphs button:focus-visible{border-color:#9ad7ff;outline:2px solid #4ca2dd}
+.artwork-icon-canvas{width:100%;max-width:360px;height:170px;background:repeating-conic-gradient(#182b40 0% 25%,#102031 0% 50%) 50% / 22px 22px;border:1px solid #5c7993;border-radius:10px;touch-action:none;cursor:crosshair}
+.artwork-mark-editor input[type=file]{width:100%;min-height:40px}
